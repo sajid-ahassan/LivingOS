@@ -1,0 +1,49 @@
+# API
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+email-validator
+
+# PostgreSQL
+sqlalchemy
+psycopg[binary]
+alembic
+
+# LangChain and LangGraph
+langchain
+langchain-core
+langchain-openai
+langchain-text-splitters
+langchain-qdrant
+langgraph
+
+# LLM and embeddings
+openai
+tiktoken
+
+# Retrieval and reranking
+qdrant-client
+rank-bm25
+sentence-transformers
+
+# Document processing
+pymupdf
+
+# HTTP and configuration
+requests
+tenacity
+python-dotenv
+
+# Machine learning and data processing
+scikit-learn
+pandas
+numpy
+pyarrow
+joblib
+
+# Testing
+pytest
+pytest-cov
+httpx

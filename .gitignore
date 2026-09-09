@@ -1,0 +1,74 @@
+# Python virtual environments
+.newenv/
+newenv/
+env/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build and package output
+build/
+dist/
+*.egg-info/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.code-workspace
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# LivingOps generated data
+data/lanl/
+data/seed/demo_ids.json
+models/*.joblib
+models/experiments/
+
+# Local databases and vector stores
+*.db
+*.sqlite
+*.sqlite3
+qdrant_storage/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+
+# Test and tool output
+.tox/
+.nox/
+test-results/
+playwright-report/
+
+# Local Docker overrides
+docker-compose.override.yml
