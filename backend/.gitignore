@@ -43,7 +43,11 @@ temp/
 Thumbs.db
 desktop.ini
 
-
+# LivingOps generated data
+data/lanl/
+data/seed/demo_ids.json
+models/*.joblib
+models/experiments/
 
 # Local databases and vector stores
 *.db

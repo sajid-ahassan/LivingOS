@@ -1,0 +1,50 @@
+[
+  {
+    "catalog_key": "LAPTOP-ENG",
+    "resource_type": "LAPTOP",
+    "default_state": "ASSIGNED",
+    "rule": "Standard managed engineering laptop"
+  },
+  {
+    "catalog_key": "EMAIL-STANDARD",
+    "resource_type": "EMAIL_ACCOUNT",
+    "default_state": "ACTIVE",
+    "rule": "Standard company email account"
+  },
+  {
+    "catalog_key": "GITHUB-AURORA-READ",
+    "resource_type": "GITHUB_ACCESS",
+    "default_state": "ACTIVE",
+    "rule": "Confidential read access requiring IT Owner approval"
+  },
+  {
+    "catalog_key": "GITHUB-AURORA-WRITE",
+    "resource_type": "GITHUB_ACCESS",
+    "default_state": "ACTIVE",
+    "rule": "Write access allowed only after training and IT Owner approval"
+  },
+  {
+    "catalog_key": "SECURITY-BASE",
+    "resource_type": "TRAINING",
+    "default_state": "ASSIGNED",
+    "rule": "Baseline security training due in seven days"
+  },
+  {
+    "catalog_key": "SECURITY-CONFIDENTIAL",
+    "resource_type": "TRAINING",
+    "default_state": "ASSIGNED",
+    "rule": "Confidential security training due in three days"
+  },
+  {
+    "catalog_key": "WORK-AURORA-API",
+    "resource_type": "WORK_ITEM",
+    "default_state": "OPEN",
+    "rule": "Aurora API work item owned by Arif at seed time"
+  },
+  {
+    "catalog_key": "DOC-AURORA-RUNBOOK",
+    "resource_type": "KNOWLEDGE_DOCUMENT",
+    "default_state": "ACTIVE",
+    "rule": "Aurora runbook owned by Arif at seed time"
+  }
+]
