@@ -1,12 +1,17 @@
-from app.enums import ActionType, ResourceState, ResourceType
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import CaseAction, CompanyResource, Person
+from app.audit.service import record_audit_event
+from app.enums import (
+    ActionType,
+    AuditActorType,
+    ResourceState,
+    ResourceType,
+)
+from app.models import Case, CaseAction, CompanyResource, Person
 from app.schemas import MockResourceApplyRequest
-
-from uuid import UUID
 
 ACTION_STATE_MAP = {
     ActionType.CREATE: ResourceState.ACTIVE,
@@ -17,6 +22,15 @@ ACTION_STATE_MAP = {
     ActionType.REQUEST_RETURN: ResourceState.RETURN_REQUESTED,
 }
 
+
+AUDIT_EVENT_TYPE_MAP = {
+    ActionType.CREATE: "RESOURCE_CREATED",
+    ActionType.ASSIGN: "RESOURCE_ASSIGNED",
+    ActionType.DISABLE: "RESOURCE_DISABLED",
+    ActionType.REVOKE: "RESOURCE_REVOKED",
+    ActionType.REASSIGN: "RESOURCE_REASSIGNED",
+    ActionType.REQUEST_RETURN: "RESOURCE_RETURN_REQUESTED",
+}
 
 CREATION_ACTIONS = {
     ActionType.CREATE,
@@ -48,6 +62,7 @@ MUTATION_RESOURCE_TYPES = {
     },
 }
 
+
 class ResourceNotFoundError(ValueError):
     pass
 
@@ -69,9 +84,49 @@ def get_target_resource_state(
         raise ValueError(
             f"Unsupported resource action: {action_type}"
         ) from error
-        
-        
-        
+
+
+def validate_source_action(
+    db: Session,
+    request: MockResourceApplyRequest,
+) -> CaseAction:
+    source_action = db.get(CaseAction, request.action_id)
+
+    if source_action is None:
+        raise ResourceNotFoundError(
+            f"Case action does not exist: {request.action_id}"
+        )
+
+    source_case = db.get(Case, source_action.case_id)
+
+    if source_case is None:
+        raise ResourceNotFoundError(
+            f"Source case does not exist: {source_action.case_id}"
+        )
+
+    if request.case_id is not None and request.case_id != source_case.id:
+        raise ResourceConflictError(
+            "The supplied case does not match the source action."
+        )
+
+    if source_case.subject_person_id != request.person_id:
+        raise ResourceConflictError(
+            "The supplied person does not match the source case."
+        )
+
+    if (
+        source_action.action_type != request.action_type
+        or source_action.resource_type != request.resource_type
+        or source_action.idempotency_key != request.idempotency_key
+    ):
+        raise ResourceConflictError(
+            "The supplied operation does not match the source action."
+        )
+
+    return source_action
+
+
+
 def create_or_assign_resource(
     db: Session,
     request: MockResourceApplyRequest,
@@ -87,6 +142,8 @@ def create_or_assign_resource(
         raise ResourceNotFoundError(
             f"Person does not exist: {request.person_id}"
         )
+
+    source_action = validate_source_action(db, request)
 
     replayed_resource = db.scalar(
         select(CompanyResource).where(
@@ -122,8 +179,6 @@ def create_or_assign_resource(
             f"{request.resource_key}"
         )
 
-    source_action = db.get(CaseAction, request.action_id)
-
     resource = CompanyResource(
         person_id=request.person_id,
         resource_type=request.resource_type,
@@ -132,25 +187,38 @@ def create_or_assign_resource(
             request.action_type
         ),
         details_data=dict(request.requested_data),
-        source_action_id=(
-            source_action.id
-            if source_action is not None
-            else None
-        ),
+        source_action_id=source_action.id,
         idempotency_key=request.idempotency_key,
     )
 
     db.add(resource)
 
     try:
+        db.flush()
+
+        record_audit_event(
+            db,
+            actor_type=AuditActorType.N8N,
+            event_type=AUDIT_EVENT_TYPE_MAP[request.action_type],
+            entity_type="company_resource",
+            entity_id=resource.id,
+            before_data=None,
+            after_data=resource_audit_data(resource),
+            evidence_data={
+                "action_id": request.action_id,
+                "requested_data": request.requested_data,
+            },
+            correlation_id=source_action.case_id,
+        )
+
         db.commit()
         db.refresh(resource)
+
     except Exception:
         db.rollback()
         raise
 
     return resource, False
-
 
 
 
@@ -176,6 +244,8 @@ def mutate_resource(
             f"{request.action_type.value} cannot be applied "
             f"to {request.resource_type.value}."
         )
+
+    source_action = validate_source_action(db, request)
 
     replayed_resource = db.scalar(
         select(CompanyResource).where(
@@ -222,6 +292,7 @@ def mutate_resource(
             "The resource does not belong to the "
             "supplied person."
         )
+    before_data = resource_audit_data(resource)
 
     updated_details = dict(resource.details_data or {})
     updated_details.update(request.requested_data)
@@ -261,20 +332,33 @@ def mutate_resource(
                 "REQUEST_RETURN requires due_date."
             )
 
-    source_action = db.get(CaseAction, request.action_id)
-
     resource.status = get_target_resource_state(
         request.action_type
     )
     resource.details_data = updated_details
     resource.idempotency_key = request.idempotency_key
 
-    if source_action is not None:
-        resource.source_action_id = source_action.id
+    resource.source_action_id = source_action.id
 
     try:
+        record_audit_event(
+            db,
+            actor_type=AuditActorType.N8N,
+            event_type=AUDIT_EVENT_TYPE_MAP[request.action_type],
+            entity_type="company_resource",
+            entity_id=resource.id,
+            before_data=before_data,
+            after_data=resource_audit_data(resource),
+            evidence_data={
+                "action_id": request.action_id,
+                "requested_data": request.requested_data,
+            },
+            correlation_id=source_action.case_id,
+        )
+
         db.commit()
         db.refresh(resource)
+
     except Exception:
         db.rollback()
         raise
@@ -305,17 +389,17 @@ def apply_resource_action(
         f"Unsupported action type: "
         f"{request.action_type.value}"
     )
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
 def get_resource_by_key(
     db: Session,
     resource_key: str,
@@ -354,3 +438,18 @@ def list_person_resources(
             .order_by(CompanyResource.created_at)
         )
     )
+
+
+
+def resource_audit_data(
+    resource: CompanyResource,
+) -> dict[str, object]:
+    return {
+        "person_id": resource.person_id,
+        "resource_type": resource.resource_type,
+        "resource_key": resource.resource_key,
+        "status": resource.status,
+        "details_data": resource.details_data,
+        "source_action_id": resource.source_action_id,
+        "idempotency_key": resource.idempotency_key,
+    }

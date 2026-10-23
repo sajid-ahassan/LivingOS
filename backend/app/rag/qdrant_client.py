@@ -13,11 +13,13 @@ def get_qdrant_client() -> QdrantClient:
     )
 
 
-def check_qdrant_connection() -> list[str]:
+def check_qdrant_connection() -> None:
+    settings = get_settings()
     client = get_qdrant_client()
 
     try:
-        response = client.get_collections()
-        return [collection.name for collection in response.collections]
+        client.get_collection(
+            collection_name=settings.qdrant_policy_collection
+        )
     finally:
         client.close()

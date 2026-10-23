@@ -38,9 +38,9 @@ def ensure_policy_collection() -> str:
         return f"Collection created: {collection_name}"
     finally:
         client.close()
-        
-        
-        
+
+
+
 def ensure_policy_version_index() -> str:
     settings = get_settings()
     client = get_qdrant_client()

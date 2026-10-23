@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1b2534" />
+  <meta name="description" content="LivingOps Security Monitoring" />
+  <title>Security · LivingOps AI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div><div class="brand-name">LivingOps</div><div class="brand-subtitle">AI Operations</div></div>
+      </div>
+      <nav class="nav-list">
+        <a class="nav-item" href="index.html"><span class="nav-icon">⌂</span><span>Dashboard</span></a>
+        <a class="nav-item" href="cases.html"><span class="nav-icon">▤</span><span>Cases</span></a>
+        <a class="nav-item" href="guardian.html"><span class="nav-icon">◈</span><span>Policy Guardian</span></a>
+        <a class="nav-item active" href="security.html" aria-current="page"><span class="nav-icon">◇</span><span>Security</span></a>
+        <a class="nav-item" href="approvals.html"><span class="nav-icon">✓</span><span>Approvals</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="system-mini"><span id="sidebarHealthDot" class="dot neutral"></span><div><strong id="sidebarHealthText">Checking system</strong><small id="sidebarEnv">LivingOps backend</small></div></div>
+        <div class="profile-card"><div class="avatar">TH</div><div class="profile-meta"><strong>Tahmid Hasan</strong><span>IT Security Owner</span></div><span class="profile-more">•••</span></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="mobile-brand">LivingOps</div>
+        <div class="search-wrap"><span class="search-icon">⌕</span><input id="securitySearch" type="search" placeholder="Search open alerts" aria-label="Search security alerts" /><span class="keycap">/</span></div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="refreshSecurity" title="Refresh security" aria-label="Refresh security">↻</button>
+          <button class="icon-button" title="Open alerts" aria-label="Open alerts">♢<span id="notificationBadge" class="notification-badge hidden">0</span></button>
+          <button class="user-chip" aria-label="Current user"><span>TH</span></button>
+        </div>
+      </header>
+
+      <section class="content security-page-content">
+        <div class="page-heading security-heading">
+          <div><p class="eyebrow">SECURITY OPERATIONS</p><h1>Security</h1><p class="page-subtitle">Monitor ML-scored access anomalies and record controlled human review decisions.</p></div>
+          <div class="heading-actions"><div class="last-updated"><span id="securityLiveDot" class="dot neutral"></span><span id="securityUpdated">Connecting…</span></div><button class="secondary-button" id="trackReviewedButton">Review History</button><button class="primary-button" id="recordEventButton"><span class="plus">＋</span> Record Access Event</button></div>
+        </div>
+
+        <div class="metrics-grid security-metrics-grid">
+          <article class="metric-card"><div class="metric-top"><span class="metric-icon red">◇</span><span class="metric-micro">LIVE</span></div><div class="metric-value" id="openAlertMetric">0</div><div class="metric-label">Open Alerts</div><div class="metric-note" id="openAlertNote">Awaiting backend data</div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-icon amber">!</span><span class="metric-micro">RISK</span></div><div class="metric-value" id="highRiskMetric">0</div><div class="metric-label">Off-hours Alerts</div><div class="metric-note">Open alerts with activity outside 06:00–22:00</div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-icon blue">ML</span><span class="metric-micro">MODEL</span></div><div class="metric-value metric-value-small" id="thresholdMetric">—</div><div class="metric-label">Decision Threshold</div><div class="metric-note">Isolation Forest artifact metadata</div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-icon green">✓</span><span class="metric-micro">LOCAL HISTORY</span></div><div class="metric-value" id="reviewedMetric">0</div><div class="metric-label">Reviewed Alerts</div><div class="metric-note" id="reviewedNote">Confirmed or false positive in this browser</div></article>
+        </div>
+
+        <article class="panel security-alerts-panel">
+          <div class="panel-head table-head security-table-head">
+            <div><h2>Open Security Alerts</h2><p>Authoritative open alerts returned by LivingOps.</p></div>
+            <div class="security-table-controls">
+              <label>Signal <select id="riskFilter"><option value="ALL">All</option><option value="OFF_HOURS">Off-hours</option><option value="FAILED">Failed event</option><option value="OTHER">Other anomaly</option></select></label>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="operations-table security-alert-table">
+              <thead><tr><th>Person</th><th>Event</th><th>Route</th><th>Anomaly score</th><th>Signal</th><th>Status</th><th>Time</th><th></th></tr></thead>
+              <tbody id="securityTableBody"><tr class="empty-row"><td colspan="8"><div class="empty-state"><div class="empty-icon">◇</div><strong>Loading security alerts</strong><span>Connecting to LivingOps.</span></div></td></tr></tbody>
+            </table>
+          </div>
+        </article>
+
+        <div class="security-lower-grid">
+          <article class="panel security-model-card">
+            <div class="panel-head"><div><h2>Detection Model</h2><p>Runtime metadata from scored events.</p></div><span class="status-pill ok">Isolation Forest</span></div>
+            <div class="security-model-body">
+              <div class="model-row"><span>Dataset</span><strong id="modelDataset">SPEDIA</strong></div>
+              <div class="model-row"><span>Model threshold</span><strong id="modelThreshold">—</strong></div>
+              <div class="model-row"><span>Feature window</span><strong>1 hour</strong></div>
+              <div class="model-row"><span>Human decision</span><strong>Required</strong></div>
+            </div>
+          </article>
+          <article class="panel reviewed-card">
+            <div class="panel-head"><div><h2>Recent Human Reviews</h2><p>Reviews completed from this browser session/history.</p></div><button class="text-button" id="clearReviewHistory">Clear local history</button></div>
+            <div id="reviewHistory" class="review-history"><div class="security-empty">No locally recorded reviews yet.</div></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="security-drawer-backdrop hidden" id="alertDrawerBackdrop"></div>
+  <aside class="security-drawer hidden" id="alertDrawer" aria-label="Security alert detail" aria-hidden="true">
+    <div class="drawer-head"><div><span class="section-label">SECURITY ALERT</span><h2 id="drawerTitle">Alert detail</h2><p id="drawerSubtitle">—</p></div><button class="close-button" id="closeAlertDrawer" aria-label="Close alert detail">×</button></div>
+    <div class="drawer-scroll">
+      <section class="drawer-section">
+        <div class="drawer-section-title"><h3>Event</h3><span id="drawerStatus" class="guardian-state open">OPEN</span></div>
+        <div class="security-detail-grid">
+          <div><span>Person</span><strong id="drawerPerson">—</strong></div><div><span>Event type</span><strong id="drawerEventType">—</strong></div>
+          <div><span>Source</span><strong id="drawerSource">—</strong></div><div><span>Destination</span><strong id="drawerDestination">—</strong></div>
+          <div><span>Event time</span><strong id="drawerTime">—</strong></div><div><span>Successful</span><strong id="drawerSuccess">—</strong></div>
+        </div>
+      </section>
+      <section class="drawer-section">
+        <div class="drawer-section-title"><h3>ML Assessment</h3><span id="drawerRisk" class="security-risk-badge">Above threshold</span></div>
+        <div class="score-display"><div><span>Anomaly score</span><strong id="drawerScore">—</strong></div><div><span>Threshold</span><strong id="drawerThreshold">—</strong></div></div>
+        <p class="drawer-note">The score is produced by the Isolation Forest safeguard. Human review determines the operational decision.</p>
+      </section>
+      <section class="drawer-section">
+        <div class="drawer-section-title"><h3>Observed Features</h3><span class="subtle-chip">1-hour window</span></div>
+        <div id="featureGrid" class="feature-grid"></div>
+      </section>
+      <section class="drawer-section human-review-section">
+        <div class="drawer-section-title"><h3>Human Review</h3><span class="subtle-chip">IT owner</span></div>
+        <form id="reviewForm">
+          <label>Reviewer<select id="reviewerId" required><option value="33333333-3333-4333-8333-333333333333">Tahmid Hasan · IT Owner</option></select></label>
+          <label>Decision<select id="reviewDecision" required><option value="CONFIRMED">Confirm anomaly</option><option value="FALSE_POSITIVE">Mark false positive</option></select></label>
+          <label>Comment<textarea id="reviewComment" rows="4" maxlength="1000" placeholder="Record the reason for this decision."></textarea></label>
+          <button class="primary-button drawer-submit" id="reviewSubmitButton" type="submit">Submit Review</button>
+        </form>
+      </section>
+    </div>
+  </aside>
+
+  <div class="modal-backdrop hidden" id="recordEventModal" role="dialog" aria-modal="true" aria-labelledby="recordEventTitle">
+    <div class="modal guardian-modal">
+      <div class="modal-header"><div><h2 id="recordEventTitle">Record Access Event</h2><p class="modal-subtitle">Send an event to LivingOps for feature construction and Isolation Forest scoring.</p></div><button class="close-button" data-close-modal="recordEventModal">×</button></div>
+      <form id="recordEventForm">
+        <div class="form-grid">
+          <label>Person<select id="eventPersonId" required><option value="44444444-4444-4444-8444-444444444444">Amina Rahman</option><option value="55555555-5555-4555-8555-555555555555">Rafi Ahmed</option><option value="66666666-6666-4666-8666-666666666666">Arif Hossain</option><option value="33333333-3333-4333-8333-333333333333">Tahmid Hasan</option></select></label>
+          <label>Event time<input id="eventTime" type="datetime-local" required /></label>
+          <label>Event type<input id="eventType" value="LOGIN" maxlength="40" required /></label>
+          <label>Result<select id="eventSuccess" required><option value="true">Success</option><option value="false">Failed</option></select></label>
+          <label class="full">Source<input id="eventSource" value="web-console" maxlength="120" required /></label>
+          <label class="full">Destination<input id="eventDestination" value="github:aurora" maxlength="120" required /></label>
+        </div>
+        <div class="security-score-preview hidden" id="eventResultPreview"></div>
+        <div class="modal-actions"><button type="button" class="secondary-button" data-close-modal="recordEventModal">Cancel</button><button type="submit" class="primary-button" id="eventSubmitButton">Score Event</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="reviewHistoryModal" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+    <div class="modal guardian-modal">
+      <div class="modal-header"><div><h2 id="historyTitle">Review History</h2><p class="modal-subtitle">Locally retained results from completed review calls. Open-alert state still comes from the backend.</p></div><button class="close-button" data-close-modal="reviewHistoryModal">×</button></div>
+      <div id="reviewHistoryModalBody" class="history-modal-body"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="security.js"></script>
+</body>
+</html>

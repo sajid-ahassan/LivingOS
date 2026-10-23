@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1b2534" />
+  <meta name="description" content="LivingOps Human Review and Approvals" />
+  <title>Approvals · LivingOps AI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div><div class="brand-name">LivingOps</div><div class="brand-subtitle">AI Operations</div></div>
+      </div>
+      <nav class="nav-list">
+        <a class="nav-item" href="index.html"><span class="nav-icon">⌂</span><span>Dashboard</span></a>
+        <a class="nav-item" href="cases.html"><span class="nav-icon">▤</span><span>Cases</span></a>
+        <a class="nav-item" href="guardian.html"><span class="nav-icon">◈</span><span>Policy Guardian</span></a>
+        <a class="nav-item" href="security.html"><span class="nav-icon">◇</span><span>Security</span></a>
+        <a class="nav-item active" href="approvals.html" aria-current="page"><span class="nav-icon">✓</span><span>Approvals</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="system-mini"><span id="sidebarHealthDot" class="dot neutral"></span><div><strong id="sidebarHealthText">Checking system</strong><small id="sidebarEnv">LivingOps backend</small></div></div>
+        <div class="profile-card"><div class="avatar">TH</div><div class="profile-meta"><strong>Tahmid Hasan</strong><span>IT Security Owner</span></div><span class="profile-more">•••</span></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="mobile-brand">LivingOps</div>
+        <div class="search-wrap"><span class="search-icon">⌕</span><input id="approvalSearch" type="search" placeholder="Search human-review queue" aria-label="Search approvals" /><span class="keycap">/</span></div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="refreshApprovals" title="Refresh approvals" aria-label="Refresh approvals">↻</button>
+          <button class="icon-button" title="Pending reviews" aria-label="Pending reviews">✓<span id="notificationBadge" class="notification-badge hidden">0</span></button>
+          <button class="user-chip" aria-label="Current user"><span>TH</span></button>
+        </div>
+      </header>
+
+      <section class="content approvals-page-content">
+        <div class="page-heading approvals-heading">
+          <div><p class="eyebrow">HUMAN CONTROL</p><h1>Approvals</h1><p class="page-subtitle">One review queue for operational plans and security decisions that require a person in the loop.</p></div>
+          <div class="heading-actions"><div class="last-updated"><span id="approvalLiveDot" class="dot neutral"></span><span id="approvalUpdated">Connecting…</span></div><button class="secondary-button" id="showResolvedButton">Resolved History</button><button class="primary-button" id="refreshQueueButton">Refresh Queue</button></div>
+        </div>
+
+        <div class="metrics-grid approval-metrics-grid">
+          <article class="metric-card"><div class="metric-top"><span class="metric-icon amber">✓</span><span class="metric-micro">QUEUE</span></div><div class="metric-value" id="pendingMetric">0</div><div class="metric-label">Pending Reviews</div><div class="metric-note">Plan approvals + open security alerts</div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-icon blue">P</span><span class="metric-micro">PLANS</span></div><div class="metric-value" id="planMetric">0</div><div class="metric-label">Plan Approvals</div><div class="metric-note">Tracked case plans awaiting decision</div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-icon red">◇</span><span class="metric-micro">SECURITY</span></div><div class="metric-value" id="securityMetric">0</div><div class="metric-label">Security Reviews</div><div class="metric-note">Open ML-scored anomaly alerts</div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-icon green">✓</span><span class="metric-micro">LOCAL HISTORY</span></div><div class="metric-value" id="resolvedMetric">0</div><div class="metric-label">Recently Resolved</div><div class="metric-note">Decisions recorded in this browser</div></article>
+        </div>
+
+        <article class="panel approvals-panel">
+          <div class="panel-head approval-table-head">
+            <div><h2>Human Review Queue</h2><p>Items that currently need an authorized decision.</p></div>
+            <div class="approval-toolbar">
+              <div class="approval-tabs" role="tablist" aria-label="Approval types">
+                <button class="approval-tab active" data-filter="ALL" role="tab">All <span id="allCount">0</span></button>
+                <button class="approval-tab" data-filter="PLAN" role="tab">Plans <span id="planCount">0</span></button>
+                <button class="approval-tab" data-filter="SECURITY" role="tab">Security <span id="securityCount">0</span></button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="operations-table approval-table">
+              <thead><tr><th>Review</th><th>Subject</th><th>Assigned to</th><th>Context</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+              <tbody id="approvalTableBody"><tr class="empty-row"><td colspan="7"><div class="empty-state"><div class="empty-icon">✓</div><strong>Loading review queue</strong><span>Collecting tracked plan approvals and live security alerts.</span></div></td></tr></tbody>
+            </table>
+          </div>
+        </article>
+
+        <div class="approval-lower-grid">
+          <article class="panel review-policy-card">
+            <div class="panel-head"><div><h2>Human-in-the-loop Policy</h2><p>LivingOps separates AI recommendations from consequential decisions.</p></div><span class="status-pill ok">Controlled</span></div>
+            <div class="review-policy-body">
+              <div class="review-policy-row"><span class="policy-step">1</span><div><strong>AI proposes</strong><p>Plans and anomaly scores are generated as evidence, not final authority.</p></div></div>
+              <div class="review-policy-row"><span class="policy-step">2</span><div><strong>Authorized person decides</strong><p>Assigned approvers or IT owners make the operational decision.</p></div></div>
+              <div class="review-policy-row"><span class="policy-step">3</span><div><strong>Decision is auditable</strong><p>Case and security workflows preserve the recorded outcome.</p></div></div>
+            </div>
+          </article>
+          <article class="panel recent-decisions-card">
+            <div class="panel-head"><div><h2>Recent Decisions</h2><p>Locally retained decisions from this frontend.</p></div><button class="text-button" id="clearResolvedHistory">Clear history</button></div>
+            <div id="resolvedList" class="resolved-list"><div class="security-empty">No decisions have been completed from this browser yet.</div></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="approval-drawer-backdrop hidden" id="approvalDrawerBackdrop"></div>
+  <aside class="approval-drawer hidden" id="approvalDrawer" aria-hidden="true" aria-label="Approval review">
+    <div class="drawer-head"><div><span class="section-label">HUMAN REVIEW</span><h2 id="drawerTitle">Review item</h2><p id="drawerSubtitle">—</p></div><button class="close-button" id="closeApprovalDrawer" aria-label="Close review">×</button></div>
+    <div class="drawer-scroll">
+      <section class="drawer-section">
+        <div class="drawer-section-title"><h3>Review Context</h3><span id="drawerTypeBadge" class="subtle-chip">—</span></div>
+        <div id="drawerContext" class="approval-context-grid"></div>
+      </section>
+      <section class="drawer-section" id="planDetailSection">
+        <div class="drawer-section-title"><h3>Plan Summary</h3><span class="subtle-chip">AI generated</span></div>
+        <p id="drawerPlanSummary" class="approval-plan-summary">—</p>
+        <div id="drawerPlanActions" class="approval-action-list"></div>
+        <div class="approval-open-case"><a id="openCaseLink" class="secondary-button" href="cases.html">Open Case Workspace</a></div>
+      </section>
+      <section class="drawer-section" id="securityDetailSection">
+        <div class="drawer-section-title"><h3>ML Assessment</h3><span class="subtle-chip">Isolation Forest</span></div>
+        <div id="drawerSecurityAssessment" class="approval-context-grid"></div>
+        <p class="drawer-note">The anomaly model flags the event. A human reviewer determines whether it is a confirmed anomaly or a false positive.</p>
+      </section>
+      <section class="drawer-section approval-decision-section">
+        <div class="drawer-section-title"><h3>Decision</h3><span id="drawerReviewerRole" class="subtle-chip">Authorized reviewer</span></div>
+        <form id="approvalDecisionForm">
+          <label>Reviewer<select id="drawerReviewer" required></select></label>
+          <label>Decision<select id="drawerDecision" required></select></label>
+          <label>Comment<textarea id="drawerComment" rows="4" maxlength="1000" placeholder="Add a concise review note."></textarea></label>
+          <button class="primary-button drawer-submit" id="approvalDecisionSubmit" type="submit">Submit Decision</button>
+        </form>
+      </section>
+    </div>
+  </aside>
+
+  <div class="modal-backdrop hidden" id="resolvedModal" role="dialog" aria-modal="true" aria-labelledby="resolvedModalTitle">
+    <div class="modal guardian-modal">
+      <div class="modal-header"><div><p class="eyebrow">DECISION HISTORY</p><h2 id="resolvedModalTitle">Resolved Reviews</h2><p class="modal-subtitle">Decisions retained locally by this frontend.</p></div><button class="close-button" data-close-modal="resolvedModal">×</button></div>
+      <div class="history-modal-body" id="resolvedModalBody"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="approvals.js" defer></script>
+</body>
+</html>

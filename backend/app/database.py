@@ -35,6 +35,9 @@ def get_db() -> Generator[Session, None, None]:
 
     try:
         yield database_session
+    except Exception:
+        database_session.rollback()
+        raise
     finally:
         database_session.close()
 
@@ -42,8 +45,8 @@ def get_db() -> Generator[Session, None, None]:
 def check_database_connection() -> None:
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
-        
-        
+
+
 def init_db() -> None:
     from app import models  # noqa: F401
 

@@ -1,0 +1,42 @@
+{
+  "dataset": "SPEDIA",
+  "label_definition": "Known-attack evaluation windows contain at least one event whose Agent_name begins with 'atacante_'. Agent_name is not used as a model feature.",
+  "rows": {
+    "all_windows": 1688,
+    "train": 952,
+    "train_normal": 817,
+    "validation": 342,
+    "test": 394
+  },
+  "known_attack_windows": {
+    "train": 135,
+    "validation": 88,
+    "test": 175
+  },
+  "threshold": 0.24980250418691796,
+  "threshold_selection": {
+    "method": "validation_f1",
+    "threshold": 0.24980250418691796,
+    "precision": 0.5,
+    "recall": 0.625,
+    "f1": 0.5555555555555556,
+    "alerts": 110,
+    "true_positives": 55
+  },
+  "calibration": {
+    "p01": -0.15970031808374976,
+    "p99": 0.3067659957882161
+  },
+  "metrics": {
+    "pr_auc": 0.5249594104417052,
+    "known_attack_recall": 0.6,
+    "alert_precision": 0.6363636363636364,
+    "f1": 0.6176470588235293,
+    "precision_at_top_k": 0.6363636363636364,
+    "top_k": 165,
+    "alerts_per_thousand": 418.78172588832484,
+    "alerts": 165,
+    "known_attack_windows": 175,
+    "detected_known_attack_windows": 105
+  }
+}

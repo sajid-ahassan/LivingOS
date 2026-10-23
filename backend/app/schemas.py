@@ -28,9 +28,6 @@ class MockResourceApplyRequest(BaseModel):
         max_length=120,
     )
 
-    callback_base_url: str | None = None
-
-
 class MockResourceApplyResponse(BaseModel):
     resource_id: UUID
     resource_key: str
