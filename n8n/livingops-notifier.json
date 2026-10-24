@@ -38,7 +38,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Format a LivingOps notification for a Slack incoming webhook (mrkdwn).\n// n8n only formats and forwards; it never decides anything.\nconst m = $('Config').first().json.request;\nconst lines = [`*${m.title}*`, m.summary, `<${m.link}|Open in LivingOps>`];\nif (m.audience) lines.push(`For: ${m.audience}`);\nreturn [{ json: { text: lines.join('\n') } }];"
+        "jsCode": "// Format a LivingOps notification for a Slack incoming webhook (mrkdwn).\n// n8n only formats and forwards; it never decides anything.\nconst m = $('Config').first().json.request;\nconst lines = [`*${m.title}*`, m.summary, `<${m.link}|Open in LivingOps>`];\nif (m.audience) lines.push(`For: ${m.audience}`);\nreturn [{ json: { text: lines.join(String.fromCharCode(10)) } }];"
       },
       "name": "Format message",
       "type": "n8n-nodes-base.code",
