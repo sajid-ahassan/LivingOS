@@ -50,6 +50,7 @@ h1 { font-size: 20px; }
 h2 { font-size: 15px; }
 h3 { font-size: 13px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; }
 .muted { color: var(--text-2); }
+.spacer { flex: 1; }
 .faint { color: var(--text-3); font-size: 12px; }
 .hidden { display: none !important; }
 
