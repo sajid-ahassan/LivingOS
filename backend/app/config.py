@@ -25,7 +25,24 @@ class Settings(BaseSettings):
 
     n8n_provisioning_webhook: str
     n8n_shared_token: str
+    n8n_notifier_webhook: str = ""
     request_timeout_seconds: int = 30
+
+    # Real GitHub demo organization. The backend only ever holds a
+    # read-only token; the write token lives in n8n credentials.
+    github_org: str = ""
+    github_repo: str = "aurora"
+    github_read_token: str = ""
+    github_arif_username: str = ""
+    github_api_url: str = "https://api.github.com"
+
+    demo_mode: str = "LIVE"
+    mcp_service_token: str = ""
+    app_base_url: str = "http://127.0.0.1:5173"
+
+    @property
+    def github_enabled(self) -> bool:
+        return bool(self.github_org and self.github_read_token)
 
     @field_validator("database_url", mode="before")
     @classmethod

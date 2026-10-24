@@ -47,3 +47,6 @@ joblib
 pytest
 pytest-cov
 httpx
+
+# Deploy keys for agent credentials (ed25519)
+cryptography

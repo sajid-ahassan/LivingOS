@@ -87,7 +87,13 @@ RESOURCES = [
         "resource_type": ResourceType.GITHUB_ACCESS,
         "resource_key": "github:aurora:arif",
         "status": ResourceState.ACTIVE,
-        "details_data": {"project": "AURORA", "access_level": "WRITE"},
+        "details_data": {
+            "project": "AURORA",
+            "access_level": "WRITE",
+            # Real collaborator on the GitHub demo org; the username comes
+            # from GITHUB_ARIF_USERNAME. Without it this stays a mock resource.
+            "github": {"repo": "aurora", "demo_account": "ARIF"},
+        },
         "idempotency_key": "seed:arif:github-aurora-write",
     },
     {
@@ -111,8 +117,8 @@ RESOURCES = [
         "details_data": {"title": "Aurora Operations Runbook", "project": "AURORA"},
         "idempotency_key": "seed:arif:aurora-runbook",
     },
-    # Hero agent: its credential becomes a real GitHub deploy key in W2;
-    # key_id stays None until then.
+    # Hero agent: its credential is a real GitHub deploy key once the demo
+    # org is set up; github.key_id stays None (mock path) until then.
     {
         "resource_type": ResourceType.AI_AGENT,
         "resource_key": "agent:aurora-release-bot",
@@ -141,7 +147,7 @@ RESOURCES = [
             "kind": "github_deploy_key",
             "repository": "aurora",
             "permission": "write",
-            "key_id": None,
+            "github": {"repo": "aurora", "key_id": None},
             "project": "AURORA",
         },
         "idempotency_key": "seed:arif:credential-aurora-release-bot",

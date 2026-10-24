@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.notifications.service import notify
 from app.policy_guardian.remediation import (
     RemediationConflictError,
     RemediationNotFoundError,
@@ -47,6 +48,20 @@ def activate_new_policy_version(
             human_review_case_ids,
             indexed_chunks,
         ) = activate_policy_change(db, request)
+
+        # Best-effort heads-up for the IT owner; never affects the response.
+        notify(
+            event_type="POLICY_IMPACTS_FOUND",
+            title=(
+                f"{new_version.policy_code} V{new_version.version_number} "
+                f"affects {len(impacts)} item(s)"
+            ),
+            summary=(
+                f"Policy Guardian found {len(impacts)} impact(s) after "
+                f"{new_version.policy_code} V{new_version.version_number} was activated."
+            ),
+            link_path=f"guardian.html?change={change.id}",
+        )
 
         return PolicyActivationResponse(
             old_version=old_version,

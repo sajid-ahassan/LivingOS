@@ -6,13 +6,19 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.audit.service import record_audit_event
+from app.config import get_settings
 from app.enums import (
     ActionState,
+    ActionType,
     AuditActorType,
     CaseState,
     PlanState,
 )
 from app.execution.n8n_client import N8NDispatchError, dispatch_to_n8n
+from app.github.client import get_read_client
+from app.github.keys import generate_public_key
+from app.github.targets import build_github_parameters
+from app.github.verifier import GitHubVerification, verify_github_action
 from app.models import Case, CaseAction, CasePlan, CompanyResource
 from app.resource_rules import (
     action_moves_owner,
@@ -59,6 +65,9 @@ def build_n8n_action_payload(
             f"Action {action.id} parameters must be an object."
         )
 
+    github = action_data.get("github")
+    requested_data = {**parameters, "github": github} if github else parameters
+
     return {
         "action_id": str(action.id),
         "case_id": str(case.id),
@@ -67,8 +76,40 @@ def build_n8n_action_payload(
         "resource_type": action.resource_type.value,
         "resource_key": resource_key,
         "idempotency_key": action.idempotency_key,
-        "requested_data": parameters,
+        # n8n routes "github" actions to the GitHub API and the rest to the
+        # mock company API.
+        "target": "github" if github else "mock",
+        "requested_data": requested_data,
     }
+
+
+def prepare_github_parameters(db: Session, action: CaseAction) -> None:
+    """Attach real-GitHub parameters once, before the first dispatch.
+
+    They are stored on the action so a retry reuses the same deploy key and
+    title instead of generating a second key.
+    """
+    action_data = action.requested_data or {}
+    if "github" in action_data:
+        return
+
+    resource = db.scalar(
+        select(CompanyResource).where(
+            CompanyResource.resource_key == action_data.get("resource_key")
+        )
+    )
+    if resource is None:
+        return
+
+    github = build_github_parameters(
+        action.action_type,
+        resource,
+        settings=get_settings(),
+        idempotency_key=action.idempotency_key,
+        new_public_key=generate_public_key,
+    )
+    if github is not None:
+        action.requested_data = {**action_data, "github": github}
 
 
 def _load_plan_and_case(
@@ -250,6 +291,7 @@ def execute_single_action(
     action: CaseAction,
     case: Case,
 ) -> CaseAction:
+    prepare_github_parameters(db, action)
     payload = build_n8n_action_payload(action, case)
     previous_status = action.status
 
@@ -413,6 +455,21 @@ def verify_action_resource(
     )
 
     problems: list[str] = []
+    github_check: GitHubVerification | None = None
+    github_params = action_data.get("github")
+    if github_params and resource is not None:
+        # Real GitHub: n8n's answer is not evidence. The backend checks
+        # GitHub with its own read-only token and only then records the
+        # change on the resource itself.
+        github_check = verify_github_action(
+            action.action_type, github_params, get_read_client()
+        )
+        if github_check.ok:
+            _apply_verified_github_change(resource, action, github_check)
+            db.flush()
+        else:
+            problems.extend(github_check.problems)
+
     if resource is None:
         problems.append("resource was not found")
     else:
@@ -444,7 +501,10 @@ def verify_action_resource(
             "resource_key": expected_key,
             "expected_status": expected_state.value,
             "problems": problems,
+            "source": "github" if github_params else "mock_company",
         }
+        if github_check is not None:
+            action.verification_data["github_observed"] = github_check.observed
         case.status = (
             CaseState.HUMAN_REVIEW if exhausted else CaseState.FAILED
         )
@@ -488,7 +548,10 @@ def verify_action_resource(
         "resource_status": resource.status.value,
         "person_id": str(resource.person_id),
         "source_action_id": str(resource.source_action_id),
+        "source": "github" if github_params else "mock_company",
     }
+    if github_check is not None:
+        action.verification_data["github_observed"] = github_check.observed
 
     try:
         record_audit_event(
@@ -515,6 +578,39 @@ def verify_action_resource(
         raise
 
     return action
+
+
+def _apply_verified_github_change(
+    resource: CompanyResource,
+    action: CaseAction,
+    verification: GitHubVerification,
+) -> None:
+    """Record on the resource what GitHub confirmed (never what n8n said)."""
+    parameters = (action.requested_data or {}).get("parameters", {})
+    details = dict(resource.details_data or {})
+    github = dict(details.get("github") or {})
+
+    if verification.new_key_id is not None:
+        github["previous_key_id"] = github.get("key_id")
+        github["key_id"] = verification.new_key_id
+    elif action.action_type == ActionType.REVOKE and "key_id" in github:
+        github["previous_key_id"] = github.get("key_id")
+        github["key_id"] = None
+    if action.action_type == ActionType.DOWNSCOPE:
+        details["permission"] = "read"
+
+    if action_moves_owner(action.action_type, parameters):
+        details["previous_person_id"] = str(resource.person_id)
+        resource.person_id = successor_from_parameters(parameters)
+
+    applied_keys = dict(details.get("applied_keys") or {})
+    applied_keys[action.idempotency_key] = action.action_type.value
+    details["applied_keys"] = applied_keys
+    details["github"] = github
+
+    resource.details_data = details
+    resource.status = target_resource_state(action.action_type, resource.resource_type)
+    resource.source_action_id = action.id
 
 
 def reconcile_applied_action(

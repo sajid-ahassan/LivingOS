@@ -14,6 +14,7 @@ from app.enums import (
     PlanState,
 )
 from app.models import Approval, Case, CasePlan, Person
+from app.notifications.service import notify
 
 
 ALLOWED_APPROVER_ROLES = {
@@ -153,6 +154,16 @@ def submit_plan_for_approval(
     except Exception:
         db.rollback()
         raise
+
+    # After the commit, and best-effort: a failed message never undoes the
+    # approval request.
+    notify(
+        event_type="APPROVAL_REQUESTED",
+        title=f"Approval needed: {case.case_type.value} plan revision {plan.revision}",
+        summary=plan.summary or "A plan is waiting for your decision.",
+        link_path=f"workspace.html?case={case.id}",
+        audience=approver.name,
+    )
 
     return approval
 

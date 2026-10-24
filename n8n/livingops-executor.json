@@ -1,0 +1,251 @@
+{
+  "name": "livingops-executor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "livingops-executor",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "LivingOps shared token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ { \"backend_url\": \"https://REPLACE-WITH-BACKEND-URL\", \"github_api\": \"https://api.github.com\", \"request\": $json.body } }}",
+        "options": {}
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.request.target }}",
+              "rightValue": "github",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Route by target",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.github_api }}/repos/{{ $json.request.requested_data.github.owner }}/{{ $json.request.requested_data.github.repo }}/keys?per_page=100",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "name": "GitHub list deploy keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "LivingOps GitHub write token"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn one approved LivingOps action into the exact GitHub calls to make.\n// Idempotent: a key already added (same title) is not added again, and a\n// key that is already gone is not deleted again.\nconst req = $('Config').first().json.request;\nconst gh = req.requested_data.github;\nconst api = $('Config').first().json.github_api;\nconst base = `${api}/repos/${gh.owner}/${gh.repo}`;\nconst existing = $input.all().map(i => i.json).filter(k => k && k.id !== undefined);\nconst calls = [];\n\nif (gh.kind === 'collaborator') {\n  if (req.action_type === 'REVOKE') {\n    calls.push({ method: 'DELETE', url: `${base}/collaborators/${gh.username}`, body: {} });\n  } else if (req.action_type === 'DOWNSCOPE') {\n    calls.push({ method: 'PUT', url: `${base}/collaborators/${gh.username}`, body: { permission: gh.permission } });\n  }\n} else if (gh.kind === 'deploy_key') {\n  const hasTitle = existing.some(k => k.title === gh.key_title);\n  if (req.action_type !== 'REVOKE' && !hasTitle) {\n    calls.push({ method: 'POST', url: `${base}/keys`, body: { title: gh.key_title, key: gh.public_key, read_only: gh.read_only } });\n  }\n  if (gh.key_id && existing.some(k => Number(k.id) === Number(gh.key_id))) {\n    calls.push({ method: 'DELETE', url: `${base}/keys/${gh.key_id}`, body: {} });\n  }\n}\nif (calls.length === 0) {\n  // Nothing left to do (a retry after success): read the repo so the\n  // workflow still ends with a successful GitHub call.\n  return [{ json: { method: 'GET', url: base, body: {}, noop: true } }];\n}\nreturn calls.map(c => ({ json: c }));"
+      },
+      "name": "Plan GitHub calls",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "name": "GitHub API call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "LivingOps GitHub write token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.backend_url }}/mock/resources/apply",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action_id: $json.request.action_id, case_id: $json.request.case_id, person_id: $json.request.person_id, action_type: $json.request.action_type, resource_type: $json.request.resource_type, resource_key: $json.request.resource_key, requested_data: $json.request.requested_data, idempotency_key: $json.request.idempotency_key }) }}",
+        "options": {}
+      },
+      "name": "Mock company apply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'SUCCEEDED', execution_id: $execution.id, external_ref: $('Config').first().json.request.resource_key, details: { target: $('Config').first().json.request.target } }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Respond success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        300
+      ],
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Route by target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by target": {
+      "main": [
+        [
+          {
+            "node": "GitHub list deploy keys",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mock company apply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub list deploy keys": {
+      "main": [
+        [
+          {
+            "node": "Plan GitHub calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan GitHub calls": {
+      "main": [
+        [
+          {
+            "node": "GitHub API call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub API call": {
+      "main": [
+        [
+          {
+            "node": "Respond success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock company apply": {
+      "main": [
+        [
+          {
+            "node": "Respond success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

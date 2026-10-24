@@ -55,6 +55,30 @@ mark that action successful without sending a third request, and continue the
 remaining pending actions. If the database no longer contains that plan, use
 the normal case workflow instead.
 
+## Execution, GitHub and notifications
+
+Approved actions go to the n8n executor (workflows in `../n8n/`). Each payload
+names its `target`:
+
+- `github`: the resource has a `details_data.github` block (repo plus a
+  collaborator or an existing deploy key) and `GITHUB_ORG` and
+  `GITHUB_READ_TOKEN` are set (not in OFFLINE mode). n8n calls the GitHub API
+  with its write token. The backend then checks GitHub itself with the
+  read-only token (`app/github/verifier.py`) and only then updates the
+  resource row and marks the action VERIFIED. n8n's answer is never evidence.
+- `mock`: everything else goes through `/mock/resources/apply` and is
+  verified against the database, as before.
+
+Agent credential DOWNSCOPE and REASSIGN rotate the deploy key (Agent Policy
+rule 6): the backend generates an ed25519 public key (needs `cryptography`),
+stores it on the action before dispatch so retries reuse it, and discards the
+private key. n8n must answer non-2xx on failure; an explicit `status: FAILED`
+in a 2xx body is also treated as a failure.
+
+Notifications (`app/notifications/service.py`) go to `N8N_NOTIFIER_WEBHOOK`
+when a plan is submitted for approval and when Guardian finds impacts. They
+are best-effort and never fail the business action.
+
 ## Demo company seed
 
 `python -m app.scripts.seed_company` creates the fictional Nexora Labs company:
