@@ -16,11 +16,11 @@ from app.enums import (
     CaseState,
     CaseType,
     PlanState,
-    ResourceState,
     ResourceType,
 )
 from app.models import Case, CasePlan, CompanyResource, Person
 from app.offboarding.prompt import OFFBOARDING_PROMPT
+from app.offboarding.rules import required_action_for_resource, safe_resource_metadata
 from app.offboarding.graph_runner import generate_offboarding_plan_via_graph
 from app.offboarding.schemas import OffboardingPlan
 from app.planning.prompt import format_policy_evidence
@@ -38,27 +38,6 @@ class OffboardingPlanningError(ValueError):
 
 class OffboardingValidationError(ValueError):
     pass
-
-
-TERMINAL_RESOURCE_STATES = {
-    ResourceState.DISABLED,
-    ResourceState.REVOKED,
-    ResourceState.RETURN_REQUESTED,
-    ResourceState.RETURNED,
-    ResourceState.REASSIGNED,
-}
-
-
-def _safe_resource_metadata(resource: CompanyResource) -> dict:
-    details = resource.details_data or {}
-    return {
-        "resource_type": resource.resource_type.value,
-        "resource_key": resource.resource_key,
-        "status": resource.status.value,
-        "owner_id": str(resource.person_id),
-        "title": details.get("title"),
-        "due_date": details.get("due_date"),
-    }
 
 
 def get_offboarding_inventory(
@@ -94,47 +73,6 @@ def _flatten_actions(plan: OffboardingPlan):
         *plan.asset_returns,
         *plan.reassignments,
     ]
-
-
-def _required_action_for_resource(resource: CompanyResource) -> ActionType | None:
-    if resource.status in TERMINAL_RESOURCE_STATES:
-        return None
-
-    if (
-        resource.resource_type == ResourceType.EMAIL_ACCOUNT
-        and resource.status == ResourceState.ACTIVE
-    ):
-        return ActionType.DISABLE
-
-    if (
-        resource.resource_type == ResourceType.GITHUB_ACCESS
-        and resource.status in {ResourceState.ACTIVE, ResourceState.ASSIGNED}
-    ):
-        return ActionType.REVOKE
-
-    if (
-        resource.resource_type == ResourceType.LAPTOP
-        and resource.status == ResourceState.ASSIGNED
-    ):
-        return ActionType.REQUEST_RETURN
-
-    if (
-        resource.resource_type == ResourceType.WORK_ITEM
-        and resource.status == ResourceState.OPEN
-    ):
-        return ActionType.REASSIGN
-
-    if (
-        resource.resource_type == ResourceType.KNOWLEDGE_DOCUMENT
-        and resource.status in {
-            ResourceState.ACTIVE,
-            ResourceState.OPEN,
-            ResourceState.ASSIGNED,
-        }
-    ):
-        return ActionType.REASSIGN
-
-    return None
 
 
 def validate_offboarding_plan(
@@ -173,7 +111,7 @@ def validate_offboarding_plan(
                 f"{sorted(invalid_evidence)}."
             )
 
-        required_action = _required_action_for_resource(resource)
+        required_action = required_action_for_resource(resource)
         if required_action is None:
             errors.append(
                 f"Resource {action.resource_key} does not require an offboarding action."
@@ -215,7 +153,7 @@ def validate_offboarding_plan(
             )
 
     for resource in resources:
-        required_action = _required_action_for_resource(resource)
+        required_action = required_action_for_resource(resource)
         if required_action is None:
             continue
 
@@ -231,7 +169,7 @@ def validate_offboarding_plan(
         for resource in resources
         if resource.resource_type
         in {ResourceType.WORK_ITEM, ResourceType.KNOWLEDGE_DOCUMENT}
-        and _required_action_for_resource(resource) == ActionType.REASSIGN
+        and required_action_for_resource(resource) == ActionType.REASSIGN
     ]
     if work_or_docs and len(plan.targeted_questions) < 2:
         errors.append(
@@ -289,7 +227,7 @@ def _generate_offboarding_plan(
             "case_facts": json.dumps(jsonable_encoder(case_facts), indent=2),
             "subject_context": json.dumps(jsonable_encoder(subject_context), indent=2),
             "resource_inventory": json.dumps(
-                [_safe_resource_metadata(resource) for resource in resources],
+                [safe_resource_metadata(resource) for resource in resources],
                 indent=2,
             ),
             "policy_evidence": format_policy_evidence(policy_context),

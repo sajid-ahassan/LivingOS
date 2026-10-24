@@ -11,6 +11,7 @@ from app.enums import (
     CaseState,
     ResourceState,
 )
+from app.mock_company.service import has_applied_key
 from app.models import Case, CaseAction, CompanyResource
 
 
@@ -74,7 +75,9 @@ def _validate_resource(
     if resource.status != expected_state:
         mismatches.append("status")
 
-    if resource.idempotency_key != action.idempotency_key:
+    if not has_applied_key(
+        resource, action.idempotency_key, action.action_type
+    ):
         mismatches.append("idempotency_key")
 
     if resource.source_action_id != action.id:

@@ -75,6 +75,57 @@ class IdempotencyConflictError(ValueError):
     pass
 
 
+APPLIED_KEYS_FIELD = "applied_keys"
+
+
+def has_applied_key(
+    resource: CompanyResource,
+    idempotency_key: str,
+    action_type: ActionType,
+) -> bool:
+    if resource.idempotency_key == idempotency_key:
+        return True
+    applied_keys = (resource.details_data or {}).get(APPLIED_KEYS_FIELD) or {}
+    return applied_keys.get(idempotency_key) == action_type.value
+
+
+def is_mutation_replay(
+    resource: CompanyResource | None,
+    key_holder: CompanyResource | None,
+    request: MockResourceApplyRequest,
+) -> bool:
+    if key_holder is not None and key_holder is not resource:
+        raise IdempotencyConflictError(
+            "The idempotency key was already used "
+            "for a different resource request."
+        )
+
+    if resource is None:
+        return False
+
+    applied_keys = (resource.details_data or {}).get(APPLIED_KEYS_FIELD) or {}
+    applied_action = applied_keys.get(request.idempotency_key)
+
+    if applied_action is None and key_holder is None:
+        return False
+
+    # key_holder alone covers rows mutated before applied_keys existed,
+    # when the mutation key overwrote the resource's idempotency_key.
+    if (
+        resource.resource_type != request.resource_type
+        or (
+            applied_action is not None
+            and applied_action != request.action_type.value
+        )
+    ):
+        raise IdempotencyConflictError(
+            "The idempotency key was already used "
+            "for a different resource request."
+        )
+
+    return True
+
+
 def get_target_resource_state(
     action_type: ActionType,
 ) -> ResourceState:
@@ -247,33 +298,24 @@ def mutate_resource(
 
     source_action = validate_source_action(db, request)
 
-    replayed_resource = db.scalar(
-        select(CompanyResource).where(
-            CompanyResource.idempotency_key
-            == request.idempotency_key
-        )
-    )
-
-    if replayed_resource is not None:
-        if (
-            replayed_resource.resource_key
-            != request.resource_key
-            or replayed_resource.resource_type
-            != request.resource_type
-        ):
-            raise IdempotencyConflictError(
-                "The idempotency key was already used "
-                "for a different resource request."
-            )
-
-        return replayed_resource, True
-
     resource = db.scalar(
         select(CompanyResource).where(
             CompanyResource.resource_key
             == request.resource_key
         )
     )
+
+    key_holder = db.scalar(
+        select(CompanyResource).where(
+            CompanyResource.idempotency_key
+            == request.idempotency_key
+        )
+    )
+
+    # Checked before the owner check: a replayed REASSIGN has already
+    # moved the resource to the successor.
+    if is_mutation_replay(resource, key_holder, request):
+        return resource, True
 
     if resource is None:
         raise ResourceNotFoundError(
@@ -332,11 +374,18 @@ def mutate_resource(
                 "REQUEST_RETURN requires due_date."
             )
 
+    # The creation key stays on the resource; mutation keys are recorded
+    # with their action so replays and conflicts can be told apart.
+    applied_keys = dict(
+        (resource.details_data or {}).get(APPLIED_KEYS_FIELD) or {}
+    )
+    applied_keys[request.idempotency_key] = request.action_type.value
+    updated_details[APPLIED_KEYS_FIELD] = applied_keys
+
     resource.status = get_target_resource_state(
         request.action_type
     )
     resource.details_data = updated_details
-    resource.idempotency_key = request.idempotency_key
 
     resource.source_action_id = source_action.id
 

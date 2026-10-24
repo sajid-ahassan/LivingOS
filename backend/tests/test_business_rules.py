@@ -9,7 +9,7 @@ from app.enums import (
     ResourceType,
 )
 from app.models import CompanyResource
-from app.offboarding.service import _required_action_for_resource
+from app.offboarding.rules import required_action_for_resource
 from app.planning.validation import (
     ALLOWED_ACTIONS,
     ALLOWED_RESOURCE_TYPES,
@@ -178,7 +178,7 @@ def test_offboarding_resource_action_mapping(
     expected_action,
 ):
     resource = _resource(resource_type, resource_state)
-    assert _required_action_for_resource(resource) == expected_action
+    assert required_action_for_resource(resource) == expected_action
 
 
 @pytest.mark.parametrize(
@@ -199,7 +199,7 @@ def test_terminal_resources_do_not_generate_new_offboarding_actions(
         terminal_state,
     )
 
-    assert _required_action_for_resource(resource) is None
+    assert required_action_for_resource(resource) is None
 
 
 def test_unhandled_resource_state_does_not_invent_action():
@@ -208,4 +208,4 @@ def test_unhandled_resource_state_does_not_invent_action():
         ResourceState.ACTIVE,
     )
 
-    assert _required_action_for_resource(resource) is None
+    assert required_action_for_resource(resource) is None

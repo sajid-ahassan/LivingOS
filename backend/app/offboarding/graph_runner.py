@@ -10,10 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.cases.policy_context import retrieve_case_policy_context
 from app.config import get_settings
-from app.enums import ActionType, ResourceState, ResourceType
+from app.enums import ActionType
 from app.graphs.offboarding import build_offboarding_graph
 from app.models import Case, CompanyResource, Person
 from app.offboarding.prompt import OFFBOARDING_PROMPT
+from app.offboarding.rules import required_action_for_resource, safe_resource_metadata
 from app.offboarding.schemas import OffboardingPlan
 from app.planning.prompt import format_policy_evidence
 
@@ -22,77 +23,12 @@ class OffboardingPlanningError(ValueError):
     pass
 
 
-TERMINAL_RESOURCE_STATES = {
-    ResourceState.DISABLED,
-    ResourceState.REVOKED,
-    ResourceState.RETURN_REQUESTED,
-    ResourceState.RETURNED,
-    ResourceState.REASSIGNED,
-}
-
-
-def _safe_resource_metadata(resource: CompanyResource) -> dict:
-    details = resource.details_data or {}
-    return {
-        "resource_type": resource.resource_type.value,
-        "resource_key": resource.resource_key,
-        "status": resource.status.value,
-        "owner_id": str(resource.person_id),
-        "title": details.get("title"),
-        "due_date": details.get("due_date"),
-    }
-
-
 def _flatten_actions(plan: OffboardingPlan):
     return [
         *plan.revocations,
         *plan.asset_returns,
         *plan.reassignments,
     ]
-
-
-def _required_action_for_resource(
-    resource: CompanyResource,
-) -> ActionType | None:
-    if resource.status in TERMINAL_RESOURCE_STATES:
-        return None
-
-    if (
-        resource.resource_type == ResourceType.EMAIL_ACCOUNT
-        and resource.status == ResourceState.ACTIVE
-    ):
-        return ActionType.DISABLE
-
-    if (
-        resource.resource_type == ResourceType.GITHUB_ACCESS
-        and resource.status in {ResourceState.ACTIVE, ResourceState.ASSIGNED}
-    ):
-        return ActionType.REVOKE
-
-    if (
-        resource.resource_type == ResourceType.LAPTOP
-        and resource.status == ResourceState.ASSIGNED
-    ):
-        return ActionType.REQUEST_RETURN
-
-    if (
-        resource.resource_type == ResourceType.WORK_ITEM
-        and resource.status == ResourceState.OPEN
-    ):
-        return ActionType.REASSIGN
-
-    if (
-        resource.resource_type == ResourceType.KNOWLEDGE_DOCUMENT
-        and resource.status
-        in {
-            ResourceState.ACTIVE,
-            ResourceState.OPEN,
-            ResourceState.ASSIGNED,
-        }
-    ):
-        return ActionType.REASSIGN
-
-    return None
 
 
 QUESTION_PROMPT = ChatPromptTemplate.from_messages(
@@ -251,7 +187,7 @@ def _base_inputs(
             indent=2,
         ),
         "resource_inventory": json.dumps(
-            [_safe_resource_metadata(resource) for resource in resources],
+            [safe_resource_metadata(resource) for resource in resources],
             indent=2,
         ),
         "policy_evidence": format_policy_evidence(policy_context),
@@ -300,7 +236,7 @@ def _validate_execution_plan(
                 f"{sorted(invalid_evidence)}."
             )
 
-        required_action = _required_action_for_resource(resource)
+        required_action = required_action_for_resource(resource)
 
         if required_action is None:
             errors.append(
@@ -345,7 +281,7 @@ def _validate_execution_plan(
             )
 
     for resource in resources:
-        required_action = _required_action_for_resource(resource)
+        required_action = required_action_for_resource(resource)
         if required_action is None:
             continue
 
@@ -368,7 +304,7 @@ def _validate_questions(
     work_or_docs = [
         resource
         for resource in resources
-        if _required_action_for_resource(resource) == ActionType.REASSIGN
+        if required_action_for_resource(resource) == ActionType.REASSIGN
     ]
 
     if work_or_docs and len(questions) < 2:
@@ -430,7 +366,7 @@ def generate_offboarding_plan_via_graph(
 
     def inventory_resources_fn(_facts: dict) -> list[dict]:
         return [
-            _safe_resource_metadata(resource)
+            safe_resource_metadata(resource)
             for resource in resources
         ]
 
