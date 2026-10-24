@@ -1,0 +1,67 @@
+# Render Blueprint: LivingOps backend + MCP gateway (free plan).
+# Secrets use `sync: false`: Render asks for them when the Blueprint is
+# created, and they never live in this file.
+#
+# Free web services sleep after ~15 idle minutes and wake on the next request
+# (about a minute). n8n is the only service kept awake (750 free hours per
+# workspace); wake these before a demo and keep the expiry sweeper inactive
+# until then, because it would keep the backend awake.
+
+services:
+  - type: web
+    name: livingops-backend
+    runtime: docker
+    plan: free
+    branch: final-build
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      # Never re-seed on start: a sleeping service restarts mid-demo.
+      - key: BOOTSTRAP_ON_START
+        value: "false"
+      - key: DEMO_MODE
+        value: LIVE
+      - key: GITHUB_ORG
+        value: nexora-labs-demo
+      - key: GITHUB_REPO
+        value: aurora
+      - key: N8N_PROVISIONING_WEBHOOK
+        value: https://automation-n8n-latest-rc77.onrender.com/webhook/livingops-executor
+      - key: N8N_NOTIFIER_WEBHOOK
+        value: https://automation-n8n-latest-rc77.onrender.com/webhook/livingops-notifier
+      - key: DATABASE_URL
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: N8N_SHARED_TOKEN
+        sync: false
+      - key: GITHUB_READ_TOKEN
+        sync: false
+      - key: GITHUB_ARIF_USERNAME
+        sync: false
+      - key: MCP_SERVICE_TOKEN
+        sync: false
+      - key: AURORA_BOT_MCP_KEY
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+
+  - type: web
+    name: livingops-mcp
+    runtime: docker
+    plan: free
+    branch: final-build
+    dockerfilePath: ./mcp_server/Dockerfile
+    dockerContext: .
+    autoDeploy: false
+    envVars:
+      # Public URL of the backend service above, e.g.
+      # https://livingops-backend.onrender.com
+      - key: LIVINGOPS_BACKEND_URL
+        sync: false

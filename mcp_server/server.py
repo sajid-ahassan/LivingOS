@@ -7,7 +7,7 @@ execution, and audits everything. Nothing is decided or stored here.
 
 Run: python -m mcp_server            (from the project root)
 Env: LIVINGOPS_BACKEND_URL (default http://127.0.0.1:8000),
-     MCP_HOST (127.0.0.1), MCP_PORT (8765)
+     MCP_HOST (127.0.0.1), MCP_PORT (or PORT on hosts like Render; 8765)
 """
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ def main() -> None:
     anyio.run(
         lambda: server.run_streamable_http_async(
             host=os.environ.get("MCP_HOST", "127.0.0.1"),
-            port=int(os.environ.get("MCP_PORT", "8765")),
+            port=int(os.environ.get("MCP_PORT") or os.environ.get("PORT") or "8765"),
         )
     )
 

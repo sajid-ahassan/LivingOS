@@ -2,7 +2,7 @@
 #   docker build -f mcp_server/Dockerfile .
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 MCP_HOST=0.0.0.0 MCP_PORT=8765
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 MCP_HOST=0.0.0.0
 WORKDIR /app
 
 COPY mcp_server/requirements.txt ./mcp_server/requirements.txt
