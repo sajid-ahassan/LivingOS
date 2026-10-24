@@ -17,6 +17,7 @@ ACTION_STATE_MAP = {
     ActionType.REASSIGN: ResourceState.REASSIGNED,
     ActionType.REQUEST_RETURN: ResourceState.RETURN_REQUESTED,
     ActionType.DOWNSCOPE: ResourceState.ACTIVE,
+    ActionType.GRANT_TEMPORARY: ResourceState.ACTIVE,
 }
 
 

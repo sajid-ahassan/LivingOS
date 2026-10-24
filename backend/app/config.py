@@ -38,6 +38,8 @@ class Settings(BaseSettings):
 
     demo_mode: str = "LIVE"
     mcp_service_token: str = ""
+    # Raw MCP key for Aurora Release Bot; only its hash is stored in the DB.
+    aurora_bot_mcp_key: str = ""
     app_base_url: str = "http://127.0.0.1:5173"
 
     @property

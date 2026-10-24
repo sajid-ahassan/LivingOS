@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Response, status
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.access_requests.routes import router as access_requests_router
 from app.agents.routes import router as agents_router
 from app.approvals.routes import router as approvals_router
 from app.audit.routes import router as audit_router
@@ -109,6 +110,7 @@ app.include_router(mock_company_router)
 app.include_router(policy_guardian_router)
 app.include_router(agents_router)
 app.include_router(demo_router)
+app.include_router(access_requests_router)
 
 
 @app.get(

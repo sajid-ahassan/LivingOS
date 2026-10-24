@@ -79,6 +79,30 @@ Notifications (`app/notifications/service.py`) go to `N8N_NOTIFIER_WEBHOOK`
 when a plan is submitted for approval and when Guardian finds impacts. They
 are best-effort and never fail the business action.
 
+## Agent access requests (MCP gateway, backend side)
+
+Agents call these through the MCP adapter (`mcp_server/`, separate process)
+with their own key in `X-Agent-Key`; the backend stores only its SHA-256 hash
+on the agent (`AURORA_BOT_MCP_KEY` seeds Aurora Release Bot's hash).
+
+| Endpoint | MCP tool |
+| --- | --- |
+| `GET /agent-identity` | `whoami` |
+| `POST /access-requests` | `request_access(system, resource, permission, duration_minutes, reason)` |
+| `GET /access-requests/{id}` | `check_request` |
+| `GET /access-grants/mine` | `list_my_access` |
+| `POST /access-grants/{grant_key}/release` | `release_access` |
+| `POST /access-grants/expire-due` | n8n sweeper, `Authorization: MCP_SERVICE_TOKEN` |
+
+Each request is an ACCESS_REQUEST case with one GRANT_TEMPORARY action, so
+approval, execution, verification and audit are the usual ones. Tiers come
+from rules (`app/access_requests/tiers.py`), not the LLM: LOW (read on a
+non-confidential repo, active sponsor, ≤24 h) is approved and executed at
+once; HIGH (write, or a confidential repo, ≤8 h) waits for the IT Owner and
+runs as soon as it is approved; DENY (production/admin, no active sponsor,
+over the limit) is refused with its reason. The LLM only writes a one- or
+two-line note for the approver. Expired grants are revoked and marked EXPIRED.
+
 ## Policy Guardian and live agent access
 
 Activating a new policy version (`POST /policy-guardian/activate`, e.g. with

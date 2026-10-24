@@ -45,6 +45,12 @@ EXPECTED_PATHS = {
     "/demo/mode",
     "/policy-guardian/impacts/{impact_id}/remediate",
     "/policy-guardian/impacts/{impact_id}/recertify",
+    "/agent-identity",
+    "/access-requests",
+    "/access-requests/{request_id}",
+    "/access-grants/mine",
+    "/access-grants/{grant_key}/release",
+    "/access-grants/expire-due",
 }
 
 

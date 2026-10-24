@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,7 +18,11 @@ from app.approvals.service import (
     decide_plan_approval,
     submit_plan_for_approval,
 )
+from app.access_requests.service import auto_execute_access_case
 from app.database import get_db
+
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(
@@ -72,7 +77,7 @@ def decide_approval(
     db: Session = Depends(get_db),
 ) -> ApprovalResponse:
     try:
-        return decide_plan_approval(
+        approval = decide_plan_approval(
             db,
             approval_id,
             request.decided_by,
@@ -100,3 +105,13 @@ def decide_approval(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         ) from error
+
+    # Agent access changes run as soon as the IT Owner approves them. A
+    # failed run stays visible on the case and never undoes the approval.
+    try:
+        auto_execute_access_case(db, approval)
+    except Exception:  # noqa: BLE001
+        logger.exception("Auto-execution after approval %s failed", approval.id)
+        db.rollback()
+
+    return approval

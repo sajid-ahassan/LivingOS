@@ -26,11 +26,14 @@ AUDIT_EVENT_TYPE_MAP = {
     ActionType.REASSIGN: "RESOURCE_REASSIGNED",
     ActionType.REQUEST_RETURN: "RESOURCE_RETURN_REQUESTED",
     ActionType.DOWNSCOPE: "RESOURCE_DOWNSCOPED",
+    ActionType.GRANT_TEMPORARY: "RESOURCE_GRANTED_TEMPORARILY",
 }
 
 CREATION_ACTIONS = {
     ActionType.CREATE,
     ActionType.ASSIGN,
+    # A time-limited agent credential is a new resource with expires_at.
+    ActionType.GRANT_TEMPORARY,
 }
 
 

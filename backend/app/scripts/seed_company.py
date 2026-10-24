@@ -416,8 +416,32 @@ def upsert_resources(db: Session, resources: list[dict]) -> None:
     db.flush()
 
 
+def _with_mcp_key_hash(resources: list[dict]) -> list[dict]:
+    """Give Aurora Release Bot its MCP identity when a key is configured.
+    Only the SHA-256 hash is stored; the raw key stays in .env."""
+    from app.access_requests.auth import hash_agent_key
+    from app.config import get_settings
+
+    raw_key = get_settings().aurora_bot_mcp_key
+    if not raw_key:
+        return resources
+    patched = []
+    for values in resources:
+        if values["resource_key"] == "agent:aurora-release-bot":
+            values = {
+                **values,
+                "details_data": {
+                    **values["details_data"],
+                    "mcp_api_key_hash": hash_agent_key(raw_key),
+                },
+            }
+        patched.append(values)
+    return patched
+
+
 def seed_company(db: Session) -> tuple[int, int]:
     people, resources = build_company()
+    resources = _with_mcp_key_hash(resources)
     upsert_people(db, people)
     upsert_resources(db, resources)
     return len(people), len(resources)
