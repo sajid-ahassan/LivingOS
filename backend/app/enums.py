@@ -19,6 +19,7 @@ class EmploymentStatus(StrEnum):
 class CaseType(StrEnum):
     ONBOARDING = "ONBOARDING"
     OFFBOARDING = "OFFBOARDING"
+    ACCESS_REQUEST = "ACCESS_REQUEST"
 
 
 class CasePriority(StrEnum):
@@ -56,6 +57,8 @@ class ActionType(StrEnum):
     REVOKE = "REVOKE"
     REASSIGN = "REASSIGN"
     REQUEST_RETURN = "REQUEST_RETURN"
+    DOWNSCOPE = "DOWNSCOPE"
+    GRANT_TEMPORARY = "GRANT_TEMPORARY"
 
 
 class ResourceType(StrEnum):
@@ -65,6 +68,8 @@ class ResourceType(StrEnum):
     TRAINING = "TRAINING"
     WORK_ITEM = "WORK_ITEM"
     KNOWLEDGE_DOCUMENT = "KNOWLEDGE_DOCUMENT"
+    AI_AGENT = "AI_AGENT"
+    AGENT_CREDENTIAL = "AGENT_CREDENTIAL"
 
 
 class ActionState(StrEnum):
@@ -130,6 +135,7 @@ class PolicyImpactTargetType(StrEnum):
     PLAN = "PLAN"
     CASE = "CASE"
     LEARNING = "LEARNING"
+    RESOURCE = "RESOURCE"
 
 
 class ImpactRecommendedAction(StrEnum):
@@ -153,6 +159,7 @@ class AuditActorType(StrEnum):
     LLM = "LLM"
     N8N = "N8N"
     ML = "ML"
+    AGENT = "AGENT"
 
 
 class ResourceState(StrEnum):
@@ -164,6 +171,8 @@ class ResourceState(StrEnum):
     RETURN_REQUESTED = "RETURN_REQUESTED"
     RETURNED = "RETURNED"
     REASSIGNED = "REASSIGNED"
+    SUSPENDED = "SUSPENDED"
+    EXPIRED = "EXPIRED"
 
 
 class AlertState(StrEnum):

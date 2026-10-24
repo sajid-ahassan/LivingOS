@@ -89,3 +89,4 @@ We target **WorkforceOS + AgentOps** together. SecureAI is not a main claim (our
 ## 7. Decision log (append one line per change)
 
 - 2026-10-23 — Final plan frozen (D1–D14). Work moves to `final-build` branch.
+- 2026-10-24 — W1.2 uses Alembic (frozen baseline `0001` + enum CHECK rebuild `0002`) instead of a standalone constraint script; Supabase is marked with `alembic stamp 0001`. Replaces `scripts/patch_resource_state.py`. A test fails if `app/enums.py` changes without a migration.

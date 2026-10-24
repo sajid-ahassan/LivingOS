@@ -22,6 +22,19 @@ case-planning, approval, and n8n execution flow.
 5. Open `http://127.0.0.1:8000/docs` or check
    `http://127.0.0.1:8000/health`.
 
+## Database schema (Alembic)
+
+The schema is managed by Alembic migrations in `migrations/versions/`. Run
+these from this `backend` directory; the database URL comes from `.env`.
+
+- Fresh database: `alembic upgrade head`
+- Database created earlier by `Base.metadata.create_all` (the Supabase demo
+  database): `alembic stamp 0001` once, then `alembic upgrade head`
+- Check the current revision: `alembic current`
+
+Every change to a value in `app/enums.py` needs a migration that updates
+`ENUM_CHECKS`; `tests/test_migrations.py` fails otherwise.
+
 The n8n Header Auth credential in the current workflow uses the
 `Authorization` header. `N8N_SHARED_TOKEN` must contain its exact value,
 including a `Bearer ` prefix if one is configured in n8n.
