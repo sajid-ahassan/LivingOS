@@ -36,6 +36,14 @@ POLICIES = [
         "department": "GLOBAL",
         "effective_from": date(2026, 10, 1),
     },
+    {
+        "file_path": SEED_DIRECTORY / "agent_policy_v1.md",
+        "policy_code": "AGENT",
+        "title": "Agent Policy",
+        "version_number": 1,
+        "department": "GLOBAL",
+        "effective_from": date(2026, 10, 1),
+    },
 ]
 
 

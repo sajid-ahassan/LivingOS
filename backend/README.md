@@ -55,10 +55,29 @@ mark that action successful without sending a third request, and continue the
 remaining pending actions. If the database no longer contains that plan, use
 the normal case workflow instead.
 
+## Demo company seed
+
+`python -m app.scripts.seed_company` creates the fictional Nexora Labs company:
+the six story characters with their fixed UUIDs, about 80 generated people in
+eight departments, their resources, and 24 AI agents (each with a credential).
+A fixed random seed and uuid5 IDs make every run identical, and re-running it
+is safe. Three agents start as orphans (inactive sponsor, departing sponsor,
+expired access); Arif's two Aurora agents become orphans because he is
+departing. Nabil deliberately has no `SECURITY-CONFIDENTIAL` training.
+
+`python -m app.scripts.reset_demo --yes` removes demo cases, plans, approvals,
+learning and audit rows for every seeded person and re-seeds the company.
+Policy versions are kept.
+
+Read-only agent endpoints: `GET /agents`, `GET /agents/orphans`,
+`GET /agents/{resource_key}`, `GET /agents/{resource_key}/grants`, and
+`GET /workforce/graph` for the dashboard map.
+
 ## Retained utility scripts
 
-- `python -m app.scripts.seed_demo`
-- `python -m app.scripts.ingest_seed_policies`
+- `python -m app.scripts.seed_company`
+- `python -m app.scripts.seed_demo` (story characters only)
+- `python -m app.scripts.ingest_seed_policies` (ACCESS, EQUIPMENT, OFFBOARDING, AGENT)
 - `python -m app.scripts.search_policies`
 
 Temporary patch scripts, endpoint smoke scripts, bytecode caches, virtual

@@ -17,10 +17,11 @@ from app.models import (
     LearningRecord,
     PolicyLink,
 )
-from app.scripts.seed_demo import PEOPLE, RESOURCES, upsert_people, upsert_resources
+from app.scripts.seed_company import build_company, seed_company
 
 
-DEMO_PERSON_IDS = {item["id"] for item in PEOPLE}
+# Every person of the generated demo company, story characters included.
+DEMO_PERSON_IDS = {person["id"] for person in build_company()[0]}
 
 
 def _collect_demo_ids(db):
@@ -153,8 +154,9 @@ def reset_demo_data() -> dict[str, int]:
             else:
                 counts["cases"] = 0
 
-            upsert_people(db)
-            upsert_resources(db)
+            people_count, resource_count = seed_company(db)
+            counts["restored_people"] = people_count
+            counts["restored_resources"] = resource_count
 
             db.commit()
 
@@ -169,10 +171,9 @@ def _print_summary(counts: dict[str, int]) -> None:
     print("\nLivingOps demo reset complete.")
     print("--------------------------------")
     for name, count in counts.items():
-        print(f"{name:20} removed: {count}")
+        label = "restored" if name.startswith("restored_") else "removed"
+        print(f"{name:20} {label}: {count}")
 
-    print(f"{'demo_people':20} restored: {len(PEOPLE)}")
-    print(f"{'seed_resources':20} restored: {len(RESOURCES)}")
     print("PolicyVersion rows preserved.")
 
 

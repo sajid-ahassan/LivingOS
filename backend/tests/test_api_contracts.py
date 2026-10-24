@@ -37,6 +37,11 @@ EXPECTED_PATHS = {
     "/policy-guardian/activate",
     "/policy-guardian/changes/{change_id}",
     "/policy-guardian/impacts/{impact_id}/regenerate",
+    "/agents",
+    "/agents/orphans",
+    "/agents/{resource_key}",
+    "/agents/{resource_key}/grants",
+    "/workforce/graph",
 }
 
 

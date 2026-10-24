@@ -7,7 +7,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from app.scripts.seed_demo import main as seed_demo
+from app.scripts.seed_company import main as seed_company
 from app.scripts.reset_demo import reset_demo_data
 
 
@@ -88,8 +88,8 @@ def health(base_url: str) -> None:
 
 
 def seed() -> None:
-    print("\n=== Seed Demo Data ===")
-    seed_demo()
+    print("\n=== Seed Demo Company ===")
+    seed_company()
 
 
 def reset_demo() -> None:
@@ -97,9 +97,10 @@ def reset_demo() -> None:
     counts = reset_demo_data()
 
     for name, count in counts.items():
-        print(f"{name:20} removed: {count}")
+        label = "restored" if name.startswith("restored_") else "removed"
+        print(f"{name:20} {label}: {count}")
 
-    print("Demo people/resources restored.")
+    print("Demo company restored.")
     print("PolicyVersion rows preserved.")
 
 

@@ -111,6 +111,74 @@ RESOURCES = [
         "details_data": {"title": "Aurora Operations Runbook", "project": "AURORA"},
         "idempotency_key": "seed:arif:aurora-runbook",
     },
+    # Hero agent: its credential becomes a real GitHub deploy key in W2;
+    # key_id stays None until then.
+    {
+        "resource_type": ResourceType.AI_AGENT,
+        "resource_key": "agent:aurora-release-bot",
+        "status": ResourceState.ACTIVE,
+        "details_data": {
+            "agent_name": "Aurora Release Bot",
+            "platform": "n8n",
+            "purpose": "Release tags and changelog for Aurora",
+            "scopes": [
+                {"system": "github", "resource": "aurora", "permission": "write"}
+            ],
+            "credential_key": "credential:aurora-release-bot",
+            "risk_tier": "HIGH",
+            "expires_at": None,
+            "last_active_at": "2026-10-22T18:40:00+06:00",
+            "project": "AURORA",
+        },
+        "idempotency_key": "seed:arif:agent-aurora-release-bot",
+    },
+    {
+        "resource_type": ResourceType.AGENT_CREDENTIAL,
+        "resource_key": "credential:aurora-release-bot",
+        "status": ResourceState.ACTIVE,
+        "details_data": {
+            "agent_key": "agent:aurora-release-bot",
+            "kind": "github_deploy_key",
+            "repository": "aurora",
+            "permission": "write",
+            "key_id": None,
+            "project": "AURORA",
+        },
+        "idempotency_key": "seed:arif:credential-aurora-release-bot",
+    },
+    # Second agent of Arif's, so scene 2 shows two orphaned agents.
+    {
+        "resource_type": ResourceType.AI_AGENT,
+        "resource_key": "agent:aurora-test-triage-bot",
+        "status": ResourceState.ACTIVE,
+        "details_data": {
+            "agent_name": "Aurora Test Triage Bot",
+            "platform": "custom",
+            "purpose": "Labels failing Aurora CI runs and opens triage notes",
+            "scopes": [
+                {"system": "github", "resource": "aurora", "permission": "read"}
+            ],
+            "credential_key": "credential:aurora-test-triage-bot",
+            "risk_tier": "LOW",
+            "expires_at": None,
+            "last_active_at": "2026-10-23T09:15:00+06:00",
+            "project": "AURORA",
+        },
+        "idempotency_key": "seed:arif:agent-aurora-test-triage-bot",
+    },
+    {
+        "resource_type": ResourceType.AGENT_CREDENTIAL,
+        "resource_key": "credential:aurora-test-triage-bot",
+        "status": ResourceState.ACTIVE,
+        "details_data": {
+            "agent_key": "agent:aurora-test-triage-bot",
+            "kind": "api_token",
+            "repository": "aurora",
+            "permission": "read",
+            "project": "AURORA",
+        },
+        "idempotency_key": "seed:arif:credential-aurora-test-triage-bot",
+    },
 ]
 
 
