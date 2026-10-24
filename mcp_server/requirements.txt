@@ -1,0 +1,4 @@
+# MCP Access Gateway adapter (separate process; talks to the backend over HTTP)
+mcp>=2.3
+httpx
+python-dotenv
