@@ -8,26 +8,20 @@ from sqlalchemy.orm import Session
 from app.audit.service import record_audit_event
 from app.enums import (
     ActionState,
-    ActionType,
     AuditActorType,
     CaseState,
     PlanState,
-    ResourceState,
 )
 from app.execution.n8n_client import N8NDispatchError, dispatch_to_n8n
 from app.models import Case, CaseAction, CasePlan, CompanyResource
+from app.resource_rules import (
+    action_moves_owner,
+    successor_from_parameters,
+    target_resource_state,
+)
 
 
 MAX_EXECUTION_ATTEMPTS = 2
-
-EXPECTED_RESOURCE_STATES = {
-    ActionType.CREATE: ResourceState.ACTIVE,
-    ActionType.ASSIGN: ResourceState.ASSIGNED,
-    ActionType.DISABLE: ResourceState.DISABLED,
-    ActionType.REVOKE: ResourceState.REVOKED,
-    ActionType.REASSIGN: ResourceState.REASSIGNED,
-    ActionType.REQUEST_RETURN: ResourceState.RETURN_REQUESTED,
-}
 
 
 class ActionPayloadError(ValueError):
@@ -382,16 +376,11 @@ def _expected_person_id(
     action: CaseAction,
     case: Case,
 ) -> UUID | None:
-    if action.action_type != ActionType.REASSIGN:
+    parameters = (action.requested_data or {}).get("parameters", {})
+    if not action_moves_owner(action.action_type, parameters):
         return case.subject_person_id
 
-    parameters = (action.requested_data or {}).get("parameters", {})
-    successor_value = parameters.get("successor_person_id")
-
-    try:
-        return UUID(str(successor_value))
-    except (TypeError, ValueError):
-        return None
+    return successor_from_parameters(parameters)
 
 
 def verify_action_resource(
@@ -412,7 +401,10 @@ def verify_action_resource(
     action_data = action.requested_data or {}
     expected_key = action_data.get("resource_key")
     expected_person_id = _expected_person_id(action, case)
-    expected_state = EXPECTED_RESOURCE_STATES[action.action_type]
+    expected_state = target_resource_state(
+        action.action_type,
+        action.resource_type,
+    )
 
     resource = db.scalar(
         select(CompanyResource).where(
@@ -552,7 +544,10 @@ def reconcile_applied_action(
     action_data = action.requested_data or {}
     expected_key = action_data.get("resource_key")
     expected_person_id = _expected_person_id(action, case)
-    expected_state = EXPECTED_RESOURCE_STATES[action.action_type]
+    expected_state = target_resource_state(
+        action.action_type,
+        action.resource_type,
+    )
 
     if (
         resource.resource_key != expected_key

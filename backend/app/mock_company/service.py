@@ -11,16 +11,11 @@ from app.enums import (
     ResourceType,
 )
 from app.models import Case, CaseAction, CompanyResource, Person
+from app.resource_rules import (
+    action_moves_owner,
+    target_resource_state,
+)
 from app.schemas import MockResourceApplyRequest
-
-ACTION_STATE_MAP = {
-    ActionType.CREATE: ResourceState.ACTIVE,
-    ActionType.ASSIGN: ResourceState.ASSIGNED,
-    ActionType.DISABLE: ResourceState.DISABLED,
-    ActionType.REVOKE: ResourceState.REVOKED,
-    ActionType.REASSIGN: ResourceState.REASSIGNED,
-    ActionType.REQUEST_RETURN: ResourceState.RETURN_REQUESTED,
-}
 
 
 AUDIT_EVENT_TYPE_MAP = {
@@ -30,6 +25,7 @@ AUDIT_EVENT_TYPE_MAP = {
     ActionType.REVOKE: "RESOURCE_REVOKED",
     ActionType.REASSIGN: "RESOURCE_REASSIGNED",
     ActionType.REQUEST_RETURN: "RESOURCE_RETURN_REQUESTED",
+    ActionType.DOWNSCOPE: "RESOURCE_DOWNSCOPED",
 }
 
 CREATION_ACTIONS = {
@@ -43,6 +39,7 @@ MUTATION_ACTIONS = {
     ActionType.REVOKE,
     ActionType.REASSIGN,
     ActionType.REQUEST_RETURN,
+    ActionType.DOWNSCOPE,
 }
 
 
@@ -52,13 +49,21 @@ MUTATION_RESOURCE_TYPES = {
     },
     ActionType.REVOKE: {
         ResourceType.GITHUB_ACCESS,
+        ResourceType.AI_AGENT,
+        ResourceType.AGENT_CREDENTIAL,
     },
     ActionType.REASSIGN: {
         ResourceType.WORK_ITEM,
         ResourceType.KNOWLEDGE_DOCUMENT,
+        ResourceType.AI_AGENT,
+        ResourceType.AGENT_CREDENTIAL,
     },
     ActionType.REQUEST_RETURN: {
         ResourceType.LAPTOP,
+    },
+    ActionType.DOWNSCOPE: {
+        ResourceType.AGENT_CREDENTIAL,
+        ResourceType.GITHUB_ACCESS,
     },
 }
 
@@ -128,13 +133,9 @@ def is_mutation_replay(
 
 def get_target_resource_state(
     action_type: ActionType,
+    resource_type: ResourceType | None = None,
 ) -> ResourceState:
-    try:
-        return ACTION_STATE_MAP[action_type]
-    except KeyError as error:
-        raise ValueError(
-            f"Unsupported resource action: {action_type}"
-        ) from error
+    return target_resource_state(action_type, resource_type)
 
 
 def validate_source_action(
@@ -339,14 +340,17 @@ def mutate_resource(
     updated_details = dict(resource.details_data or {})
     updated_details.update(request.requested_data)
 
-    if request.action_type == ActionType.REASSIGN:
+    if action_moves_owner(
+        request.action_type,
+        request.requested_data,
+    ):
         successor_value = request.requested_data.get(
             "successor_person_id"
         )
 
         if successor_value is None:
             raise ValueError(
-                "REASSIGN requires successor_person_id."
+                f"{request.action_type.value} requires successor_person_id."
             )
 
         try:
@@ -383,7 +387,8 @@ def mutate_resource(
     updated_details[APPLIED_KEYS_FIELD] = applied_keys
 
     resource.status = get_target_resource_state(
-        request.action_type
+        request.action_type,
+        resource.resource_type,
     )
     resource.details_data = updated_details
 

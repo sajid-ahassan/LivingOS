@@ -53,10 +53,18 @@ def test_offboarding_allows_only_mutation_actions():
         ActionType.REVOKE,
         ActionType.REASSIGN,
         ActionType.REQUEST_RETURN,
+        ActionType.DOWNSCOPE,
     }
 
     assert ActionType.CREATE not in ALLOWED_ACTIONS[CaseType.OFFBOARDING]
     assert ActionType.ASSIGN not in ALLOWED_ACTIONS[CaseType.OFFBOARDING]
+    assert ActionType.GRANT_TEMPORARY not in ALLOWED_ACTIONS[CaseType.OFFBOARDING]
+
+
+def test_access_request_allows_only_temporary_grants():
+    assert ALLOWED_ACTIONS[CaseType.ACCESS_REQUEST] == {
+        ActionType.GRANT_TEMPORARY,
+    }
 
 
 @pytest.mark.parametrize(
@@ -80,18 +88,32 @@ def test_offboarding_allows_only_mutation_actions():
         ),
         (
             ActionType.REVOKE,
-            {ResourceType.GITHUB_ACCESS},
+            {
+                ResourceType.GITHUB_ACCESS,
+                ResourceType.AI_AGENT,
+                ResourceType.AGENT_CREDENTIAL,
+            },
         ),
         (
             ActionType.REASSIGN,
             {
                 ResourceType.WORK_ITEM,
                 ResourceType.KNOWLEDGE_DOCUMENT,
+                ResourceType.AI_AGENT,
+                ResourceType.AGENT_CREDENTIAL,
             },
         ),
         (
             ActionType.REQUEST_RETURN,
             {ResourceType.LAPTOP},
+        ),
+        (
+            ActionType.DOWNSCOPE,
+            {ResourceType.AGENT_CREDENTIAL, ResourceType.GITHUB_ACCESS},
+        ),
+        (
+            ActionType.GRANT_TEMPORARY,
+            {ResourceType.AGENT_CREDENTIAL, ResourceType.GITHUB_ACCESS},
         ),
     ],
 )
@@ -108,6 +130,7 @@ def test_mutation_action_set_is_complete():
         ActionType.REVOKE,
         ActionType.REASSIGN,
         ActionType.REQUEST_RETURN,
+        ActionType.DOWNSCOPE,
     }
 
 

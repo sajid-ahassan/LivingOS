@@ -128,6 +128,7 @@ def revise_plan(
         case=case,
         policy_context=policy_context,
         resources=list(resources),
+        get_person=lambda person_id: db.get(Person, person_id),
     )
 
     approver = _resolve_approver(db, case)

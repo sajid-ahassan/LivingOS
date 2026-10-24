@@ -1,6 +1,14 @@
+from collections.abc import Callable
+from uuid import UUID
+
 from app.cases.schemas import CasePolicyContextResponse
 from app.enums import ActionType, CaseType, ResourceState, ResourceType
-from app.models import Case, CompanyResource
+from app.models import Case, CompanyResource, Person
+from app.offboarding.rules import (
+    allowed_offboarding_actions,
+    validate_access_evidence,
+    validate_agent_coverage,
+)
 from app.planning.schemas import GeneratedCasePlan
 
 
@@ -14,6 +22,10 @@ ALLOWED_ACTIONS = {
         ActionType.REVOKE,
         ActionType.REASSIGN,
         ActionType.REQUEST_RETURN,
+        ActionType.DOWNSCOPE,
+    },
+    CaseType.ACCESS_REQUEST: {
+        ActionType.GRANT_TEMPORARY,
     },
 }
 
@@ -32,13 +44,25 @@ ALLOWED_RESOURCE_TYPES = {
     },
     ActionType.REVOKE: {
         ResourceType.GITHUB_ACCESS,
+        ResourceType.AI_AGENT,
+        ResourceType.AGENT_CREDENTIAL,
     },
     ActionType.REASSIGN: {
         ResourceType.WORK_ITEM,
         ResourceType.KNOWLEDGE_DOCUMENT,
+        ResourceType.AI_AGENT,
+        ResourceType.AGENT_CREDENTIAL,
     },
     ActionType.REQUEST_RETURN: {
         ResourceType.LAPTOP,
+    },
+    ActionType.DOWNSCOPE: {
+        ResourceType.AGENT_CREDENTIAL,
+        ResourceType.GITHUB_ACCESS,
+    },
+    ActionType.GRANT_TEMPORARY: {
+        ResourceType.AGENT_CREDENTIAL,
+        ResourceType.GITHUB_ACCESS,
     },
 }
 
@@ -48,6 +72,7 @@ MUTATION_ACTIONS = {
     ActionType.REVOKE,
     ActionType.REASSIGN,
     ActionType.REQUEST_RETURN,
+    ActionType.DOWNSCOPE,
 }
 
 
@@ -75,6 +100,7 @@ def validate_generated_plan(
     case: Case,
     policy_context: CasePolicyContextResponse,
     resources: list[CompanyResource],
+    get_person: Callable[[UUID], Person | None] | None = None,
 ) -> None:
     errors: list[str] = []
 
@@ -167,6 +193,14 @@ def validate_generated_plan(
                     f"Action {action.sequence} has the wrong "
                     "resource type for its resource key."
                 )
+            elif case.case_type == CaseType.OFFBOARDING:
+                allowed = allowed_offboarding_actions(existing_resource)
+                if allowed and action.action_type not in allowed:
+                    errors.append(
+                        f"Action {action.sequence} must be one of "
+                        f"{sorted(item.value for item in allowed)} "
+                        f"for {action.resource_key}."
+                    )
 
         elif existing_resource is not None:
             errors.append(
@@ -213,6 +247,17 @@ def validate_generated_plan(
             errors.append(
                 f"Action {action.sequence} requires due_date."
             )
+
+    if case.case_type == CaseType.OFFBOARDING:
+        errors.extend(
+            validate_agent_coverage(
+                plan.actions,
+                resources,
+                subject_person_id=case.subject_person_id,
+                get_person=get_person,
+            )
+        )
+        errors.extend(validate_access_evidence(plan.actions, policy_context))
 
     if errors:
         raise GeneratedPlanValidationError(

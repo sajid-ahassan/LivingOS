@@ -14,7 +14,14 @@ from app.enums import ActionType
 from app.graphs.offboarding import build_offboarding_graph
 from app.models import Case, CompanyResource, Person
 from app.offboarding.prompt import OFFBOARDING_PROMPT
-from app.offboarding.rules import required_action_for_resource, safe_resource_metadata
+from app.offboarding.rules import (
+    AGENT_RESOURCE_TYPES,
+    allowed_offboarding_actions,
+    required_action_for_resource,
+    safe_resource_metadata,
+    validate_access_evidence,
+    validate_agent_coverage,
+)
 from app.offboarding.schemas import OffboardingPlan
 from app.planning.prompt import format_policy_evidence
 
@@ -200,6 +207,7 @@ def _validate_execution_plan(
     plan: OffboardingPlan,
     resources: list[CompanyResource],
     allowed_evidence_ids: set[str],
+    policy_context,
 ) -> list[str]:
     """
     Validate the executable offboarding actions only.
@@ -236,19 +244,24 @@ def _validate_execution_plan(
                 f"{sorted(invalid_evidence)}."
             )
 
-        required_action = required_action_for_resource(resource)
+        allowed_actions = allowed_offboarding_actions(resource)
 
-        if required_action is None:
+        if not allowed_actions:
             errors.append(
                 f"Resource {action.resource_key} does not require an offboarding action."
             )
-        elif action.action_type != required_action:
+        elif action.action_type not in allowed_actions:
             errors.append(
-                f"Resource {action.resource_key} requires {required_action.value}, "
+                f"Resource {action.resource_key} requires "
+                f"{' or '.join(sorted(item.value for item in allowed_actions))}, "
                 f"not {action.action_type.value}."
             )
 
-        if action.action_type == ActionType.REASSIGN:
+        # Agent successors are checked by validate_agent_coverage below.
+        if (
+            action.action_type == ActionType.REASSIGN
+            and resource.resource_type not in AGENT_RESOURCE_TYPES
+        ):
             successor_value = action.requested_data.get("successor_person_id")
             if not successor_value:
                 errors.append(
@@ -291,6 +304,16 @@ def _validate_execution_plan(
                 f"Resource {resource.resource_key} requires exactly one "
                 f"{required_action.value} action."
             )
+
+    errors.extend(
+        validate_agent_coverage(
+            actions,
+            resources,
+            subject_person_id=case.subject_person_id,
+            get_person=lambda person_id: db.get(Person, person_id),
+        )
+    )
+    errors.extend(validate_access_evidence(actions, policy_context))
 
     return errors
 
@@ -425,6 +448,7 @@ def generate_offboarding_plan_via_graph(
             plan,
             resources,
             allowed_evidence_ids,
+            policy_context,
         )
 
     def generate_questions_fn(
