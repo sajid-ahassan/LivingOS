@@ -69,6 +69,12 @@ departing. Nabil deliberately has no `SECURITY-CONFIDENTIAL` training.
 learning and audit rows for every seeded person, re-seeds the company, and
 then resets the seed policies to V1 (see below).
 
+`python -m app.scripts.reindex_policies` rebuilds the Qdrant policy index
+when the collection is lost: it creates the collection and the
+`policy_version_id` payload index if missing, then re-indexes V1 of each seed
+policy from the text stored in PostgreSQL (checked against its content hash).
+It never changes policy status. Run it before `reset_policies` on a new cluster.
+
 `python -m app.scripts.reset_policies` brings ACCESS, EQUIPMENT, OFFBOARDING
 and AGENT back to V1: it deletes later versions with their policy changes,
 impacts, impact approvals and policy links, makes V1 CURRENT, and removes the
