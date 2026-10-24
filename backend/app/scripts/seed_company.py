@@ -439,9 +439,29 @@ def _with_mcp_key_hash(resources: list[dict]) -> list[dict]:
     return patched
 
 
+def _with_github_ids(resources: list[dict]) -> list[dict]:
+    """Re-attach the real deploy key id saved by link_github_demo, so a
+    reset keeps the bot's credential connected to GitHub."""
+    from app.scripts.link_github_demo import (
+        BOT_CREDENTIAL_KEY,
+        apply_bot_key,
+        load_demo_ids,
+    )
+
+    key_id = load_demo_ids().get("aurora_release_bot_key_id")
+    if not key_id:
+        return resources
+    return [
+        {**values, "details_data": apply_bot_key(values["details_data"], int(key_id))}
+        if values["resource_key"] == BOT_CREDENTIAL_KEY
+        else values
+        for values in resources
+    ]
+
+
 def seed_company(db: Session) -> tuple[int, int]:
     people, resources = build_company()
-    resources = _with_mcp_key_hash(resources)
+    resources = _with_github_ids(_with_mcp_key_hash(resources))
     upsert_people(db, people)
     upsert_resources(db, resources)
     return len(people), len(resources)

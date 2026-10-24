@@ -68,3 +68,5 @@ playwright-report/
 
 # Local Docker overrides
 docker-compose.override.yml
+# Environment-specific ids of the real GitHub demo org (deploy key ids)
+data/seed/demo_ids.json
