@@ -79,6 +79,23 @@ Notifications (`app/notifications/service.py`) go to `N8N_NOTIFIER_WEBHOOK`
 when a plan is submitted for approval and when Guardian finds impacts. They
 are best-effort and never fail the business action.
 
+## Explainability, evidence and evaluation
+
+- `GET /plans/{plan_id}/explanation`: data for the "why" panel. For each
+  step: cited policy evidence (version, status, the policy's numbered
+  clauses), approved lessons listed separately, the step's reason, how it was
+  verified, and whether the AI plan passed validation first time or needed
+  its one repair. No chain-of-thought.
+- `GET /cases/{case_id}/evidence` (HTML, printable; `?format=json`): ISO/IEC
+  27001:2022 supporting evidence for controls 6.5, 5.11, 5.18 and 8.2. It
+  says on the page that it is not a certification.
+- `python -m app.scripts.run_evaluation` writes `data/eval/latest.json`
+  (served by `GET /evaluation/latest`): plan first-pass and after-repair
+  validity, policy-evidence coverage, retrieval recall@1/@3 on seeded
+  questions, Guardian recall and false impacts on seeded scenarios, verified
+  completion, recovered retries and absorbed replays. Every number carries its
+  sample size. Run it after rehearsals and before `reset_demo`.
+
 ## Agent access requests (MCP gateway, backend side)
 
 Agents call these through the MCP adapter (`mcp_server/`, separate process)

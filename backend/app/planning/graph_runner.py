@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.cases.policy_context import retrieve_case_policy_context
 from app.cases.schemas import CasePolicyContextResponse
 from app.config import get_settings
+from app.evaluation.attempts import record_plan_generation_attempt
 from app.graphs.onboarding import build_onboarding_graph
 from app.models import Case, CompanyResource, Person
 from app.planning.prompt import PLANNING_PROMPT, format_policy_evidence
@@ -284,9 +285,14 @@ def generate_case_plan_via_graph(
     )
 
     terminal_state = result.get("terminal_state")
+    repair_count = int(result.get("repair_count", 0))
 
     if terminal_state == "NEEDS_HUMAN_REVIEW":
         errors = result.get("validation_errors") or []
+        record_plan_generation_attempt(
+            case_id=case.id, case_type="ONBOARDING",
+            repair_count=repair_count, valid=False, errors=list(errors),
+        )
         raise GeneratedPlanValidationError(
             "Onboarding LangGraph could not produce a valid plan "
             f"after one repair attempt. Errors: {'; '.join(errors)}"
@@ -298,4 +304,7 @@ def generate_case_plan_via_graph(
             "Onboarding LangGraph returned no final plan."
         )
 
+    record_plan_generation_attempt(
+        case_id=case.id, case_type="ONBOARDING", repair_count=repair_count, valid=True,
+    )
     return GeneratedCasePlan.model_validate(final_output)

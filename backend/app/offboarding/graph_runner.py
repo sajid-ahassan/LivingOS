@@ -13,6 +13,7 @@ from app.config import get_settings
 from app.enums import ActionType
 from app.graphs.offboarding import build_offboarding_graph
 from app.models import Case, CompanyResource, Person
+from app.evaluation.attempts import record_plan_generation_attempt
 from app.offboarding.prompt import OFFBOARDING_PROMPT
 from app.offboarding.rules import (
     AGENT_RESOURCE_TYPES,
@@ -606,11 +607,16 @@ def generate_offboarding_plan_via_graph(
         }
     )
 
+    repair_count = int(result.get("repair_count", 0))
     if result.get("terminal_state") == "NEEDS_HUMAN_REVIEW":
         errors = (
             result.get("question_errors")
             or result.get("validation_errors")
             or []
+        )
+        record_plan_generation_attempt(
+            case_id=case.id, case_type="OFFBOARDING",
+            repair_count=repair_count, valid=False, errors=list(errors),
         )
         raise OffboardingPlanningError(
             "Offboarding LangGraph could not produce a valid plan "
@@ -624,6 +630,9 @@ def generate_offboarding_plan_via_graph(
         )
 
     plan = OffboardingPlan.model_validate(final_output)
+    record_plan_generation_attempt(
+        case_id=case.id, case_type="OFFBOARDING", repair_count=repair_count, valid=True,
+    )
 
     # Final deterministic safety check using the existing full validator
     # remains in the service after this function returns.

@@ -51,6 +51,9 @@ EXPECTED_PATHS = {
     "/access-grants/mine",
     "/access-grants/{grant_key}/release",
     "/access-grants/expire-due",
+    "/plans/{plan_id}/explanation",
+    "/cases/{case_id}/evidence",
+    "/evaluation/latest",
 }
 
 
