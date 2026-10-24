@@ -94,11 +94,11 @@ def test_openapi_has_no_duplicate_operation_ids():
     assert len(operation_ids) == len(set(operation_ids))
 
 
-def test_openapi_metadata_is_stage2_ready():
+def test_openapi_metadata_is_final_build():
     spec = app.openapi()
 
     assert spec["info"]["title"] == "LivingOps AI"
-    assert spec["info"]["version"] == "0.2.0-stage2"
+    assert spec["info"]["version"] == "0.9.0-final-build"
     assert "operations command center" in spec["info"]["description"].lower()
 
 
