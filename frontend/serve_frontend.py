@@ -12,8 +12,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-HOST = "127.0.0.1"
-PORT = 5173
+HOST = os.environ.get("FRONTEND_HOST", "127.0.0.1")
+PORT = int(os.environ.get("FRONTEND_PORT", "5173"))
 BACKEND = os.environ.get("LIVINGOPS_BACKEND", "http://127.0.0.1:8000").rstrip("/")
 ROOT = os.path.dirname(os.path.abspath(__file__))
 

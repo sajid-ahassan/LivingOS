@@ -16,20 +16,15 @@ langchain
 langchain-core
 langchain-openai
 langchain-text-splitters
-langchain-qdrant
 langgraph
 
 # LLM and embeddings
 openai
 tiktoken
 
-# Retrieval and reranking
+# Retrieval (hybrid dense + BM25; no reranker)
 qdrant-client
 rank-bm25
-sentence-transformers
-
-# Document processing
-pymupdf
 
 # HTTP and configuration
 requests

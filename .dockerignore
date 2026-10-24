@@ -1,0 +1,14 @@
+.git
+backend/.git
+newenv
+.env
+**/.env
+**/__pycache__
+**/*.pyc
+.pytest_cache
+**/.pytest_cache
+.claude
+data/spedia
+data/eval
+docs
+*.zip

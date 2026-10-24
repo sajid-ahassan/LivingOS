@@ -87,7 +87,7 @@ OPENAPI_TAGS = [
 
 app = FastAPI(
     title="LivingOps AI",
-    version="0.2.0-stage2",
+    version="0.9.0-final-build",
     description=(
         "AI operations command center for policy-grounded case planning, "
         "human approval, execution, auditability, approved learning, "
