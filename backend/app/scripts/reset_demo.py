@@ -17,6 +17,7 @@ from app.models import (
     LearningRecord,
     PolicyLink,
 )
+from app.scripts.reset_policies import reset_seed_policies
 from app.scripts.seed_company import build_company, seed_company
 
 
@@ -62,12 +63,13 @@ def _collect_demo_ids(db):
     return case_ids, plan_ids, action_ids, learning_ids
 
 
-def reset_demo_data() -> dict[str, int]:
+def reset_demo_data(*, reset_policies: bool = True) -> dict[str, int]:
     """
-    Clear deterministic demo transactional data and restore seed people/resources.
+    Clear deterministic demo transactional data and restore the seed company.
 
-    PolicyVersion rows are intentionally preserved because policy versions are
-    also represented in Qdrant and should not be reset independently.
+    With reset_policies (the default), every seed policy is then brought back
+    to V1 by app.scripts.reset_policies, which also cleans the Qdrant points of
+    removed versions, so a rehearsal can activate Access Policy V2 again.
     """
     counts: dict[str, int] = {}
 
@@ -164,6 +166,12 @@ def reset_demo_data() -> dict[str, int]:
             db.rollback()
             raise
 
+    if reset_policies:
+        _, policy_counts = reset_seed_policies()
+        for name, count in policy_counts.items():
+            key = name if name.startswith("restored_") else f"policy_reset_{name}"
+            counts[key] = count
+
     return counts
 
 
@@ -172,9 +180,9 @@ def _print_summary(counts: dict[str, int]) -> None:
     print("--------------------------------")
     for name, count in counts.items():
         label = "restored" if name.startswith("restored_") else "removed"
-        print(f"{name:20} {label}: {count}")
+        print(f"{name:36} {label}: {count}")
 
-    print("PolicyVersion rows preserved.")
+    print("Seed policies are back on V1.")
 
 
 def main() -> None:

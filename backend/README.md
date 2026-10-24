@@ -66,8 +66,14 @@ expired access); Arif's two Aurora agents become orphans because he is
 departing. Nabil deliberately has no `SECURITY-CONFIDENTIAL` training.
 
 `python -m app.scripts.reset_demo --yes` removes demo cases, plans, approvals,
-learning and audit rows for every seeded person and re-seeds the company.
-Policy versions are kept.
+learning and audit rows for every seeded person, re-seeds the company, and
+then resets the seed policies to V1 (see below).
+
+`python -m app.scripts.reset_policies` brings ACCESS, EQUIPMENT, OFFBOARDING
+and AGENT back to V1: it deletes later versions with their policy changes,
+impacts, impact approvals and policy links, makes V1 CURRENT, and removes the
+later versions' Qdrant points. It stops without changes if a V1 has no Qdrant
+points. This is what lets every rehearsal activate Access Policy V2 again.
 
 Read-only agent endpoints: `GET /agents`, `GET /agents/orphans`,
 `GET /agents/{resource_key}`, `GET /agents/{resource_key}/grants`, and

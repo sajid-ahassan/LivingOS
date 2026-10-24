@@ -3,6 +3,7 @@ from uuid import UUID
 from qdrant_client.models import (
     FieldCondition,
     Filter,
+    FilterSelector,
     MatchValue,
     PointStruct,
 )
@@ -82,5 +83,31 @@ def count_policy_chunks(policy_version_id: UUID) -> int:
         )
 
         return result.count
+    finally:
+        client.close()
+
+
+def delete_policy_chunks(policy_version_id: UUID) -> None:
+    """Remove every Qdrant point of one policy version."""
+    settings = get_settings()
+    client = get_qdrant_client()
+
+    policy_filter = Filter(
+        must=[
+            FieldCondition(
+                key="policy_version_id",
+                match=MatchValue(
+                    value=str(policy_version_id)
+                ),
+            )
+        ]
+    )
+
+    try:
+        client.delete(
+            collection_name=settings.qdrant_policy_collection,
+            points_selector=FilterSelector(filter=policy_filter),
+            wait=True,
+        )
     finally:
         client.close()
