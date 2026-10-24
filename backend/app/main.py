@@ -6,6 +6,8 @@ from app.approvals.routes import router as approvals_router
 from app.audit.routes import router as audit_router
 from app.cases.routes import router as cases_router
 from app.config import get_settings
+from app.demo.ai_cache import install_demo_llm_cache
+from app.demo.routes import router as demo_router
 from app.database import check_database_connection
 from app.execution.routes import router as execution_router
 from app.handover.routes import router as handover_router
@@ -20,6 +22,9 @@ from app.security.routes import router as security_router
 
 
 settings = get_settings()
+
+# Every LLM call goes through the DEMO_MODE cache (LIVE / CACHED_AI / OFFLINE).
+install_demo_llm_cache()
 
 OPENAPI_TAGS = [
     {
@@ -103,6 +108,7 @@ app.include_router(security_router)
 app.include_router(mock_company_router)
 app.include_router(policy_guardian_router)
 app.include_router(agents_router)
+app.include_router(demo_router)
 
 
 @app.get(

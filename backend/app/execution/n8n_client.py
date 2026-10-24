@@ -14,6 +14,14 @@ def dispatch_to_n8n(
 ) -> dict[str, Any]:
     settings = get_settings()
 
+    if settings.demo_mode.strip().upper() == "OFFLINE":
+        from app.demo.offline_executor import dispatch_offline
+
+        try:
+            return dispatch_offline(payload)
+        except Exception as error:
+            raise N8NDispatchError(f"Offline executor failed: {error}") from error
+
     try:
         response = requests.post(
             settings.n8n_provisioning_webhook,

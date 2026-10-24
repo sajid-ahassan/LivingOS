@@ -42,6 +42,7 @@ EXPECTED_PATHS = {
     "/agents/{resource_key}",
     "/agents/{resource_key}/grants",
     "/workforce/graph",
+    "/demo/mode",
 }
 
 

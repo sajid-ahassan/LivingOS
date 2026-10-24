@@ -79,6 +79,25 @@ Notifications (`app/notifications/service.py`) go to `N8N_NOTIFIER_WEBHOOK`
 when a plan is submitted for approval and when Guardian finds impacts. They
 are best-effort and never fail the business action.
 
+## Demo mode
+
+`DEMO_MODE` in `.env` decides how AI calls and execution behave
+(`app/demo/`), and `GET /demo/mode` reports it for the Dashboard badge:
+
+| Mode | LLM and embeddings | Execution |
+| --- | --- | --- |
+| `LIVE` | OpenAI, every answer recorded to `data/demo_cache/` | n8n, real GitHub when configured |
+| `CACHED_AI` | recorded answer first, OpenAI only on a miss | n8n, real GitHub when configured |
+| `OFFLINE` | recorded answers only; a miss is an error | in-process mock executor, no n8n/GitHub |
+
+All LLM calls go through LangChain's global cache (`install_demo_llm_cache`
+in `app/main.py`); embeddings go through `get_embedding_model()`. Cache keys
+replace per-run case/plan/action UUIDs and full timestamps with placeholders,
+so a rehearsal after `reset_demo` reuses earlier answers; seeded person IDs
+are kept. Rehearse each scene once in LIVE to fill the cache, and commit
+`data/demo_cache/` so another laptop can run OFFLINE (it holds model answers
+and vectors, no secrets).
+
 ## Demo company seed
 
 `python -m app.scripts.seed_company` creates the fictional Nexora Labs company:
