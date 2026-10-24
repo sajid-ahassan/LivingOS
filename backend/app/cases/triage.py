@@ -13,6 +13,7 @@ REQUIRED_CASE_FACTS = {
         "last_working_day",
         "manager_id",
     },
+    CaseType.ACCESS_REQUEST: set(),
 }
 
 

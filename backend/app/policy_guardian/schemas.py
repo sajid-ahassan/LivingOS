@@ -108,3 +108,27 @@ class RegenerateImpactResponse(BaseModel):
     case_id: UUID
     case_status: str
     evidence_ids: list[str]
+
+
+class ResourceRemediationRequest(BaseModel):
+    requested_by: UUID
+
+
+class ResourceRemediationResponse(BaseModel):
+    impact_id: UUID
+    impact_status: ImpactState
+    case_id: UUID
+    plan_id: UUID
+    approval_id: UUID
+    assigned_to: UUID
+
+
+class ResourceRecertifyRequest(BaseModel):
+    decided_by: UUID
+
+
+class ResourceRecertifyResponse(BaseModel):
+    impact_id: UUID
+    impact_status: ImpactState
+    resource_key: str
+    sponsor_id: UUID

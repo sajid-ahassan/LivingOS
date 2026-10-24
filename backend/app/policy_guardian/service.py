@@ -37,7 +37,9 @@ from app.models import (
     Case,
     CaseAction,
     CasePlan,
+    CompanyResource,
     LearningRecord,
+    Person,
     PolicyChange,
     PolicyImpact,
     PolicyLink,
@@ -46,6 +48,13 @@ from app.models import (
 from app.policy_guardian.prompt import GUARDIAN_CHANGE_PROMPT
 from app.policy_guardian.schemas import GuardianChangeSummary, PolicyActivateRequest
 from app.policy_guardian.graph_runner import analyze_policy_change_via_graph
+from app.policy_guardian.resource_rules import (
+    COMPLETED_TRAINING_STATES,
+    LIVE_STATES,
+    ResourceContext,
+    evaluate_resources,
+    newly_added_rules,
+)
 from app.rag.policy_chunks import build_policy_chunks
 from app.rag.policy_loader import split_policy_text
 from app.rag.policy_registry import register_policy_draft
@@ -146,10 +155,16 @@ def _current_policy(db: Session, policy_code: str) -> PolicyVersion:
 
 def _plan_contains_sensitive_access(plan: CasePlan) -> bool:
     data = dict(plan.plan_data or {})
-    actions = list(data.get("actions") or [])
+    actions = list(data.get("actions") or []) or [
+        *(data.get("revocations") or []),
+        *(data.get("asset_returns") or []),
+        *(data.get("reassignments") or []),
+    ]
     sensitive = {
         ResourceType.GITHUB_ACCESS.value,
         ResourceType.EMAIL_ACCOUNT.value,
+        ResourceType.AI_AGENT.value,
+        ResourceType.AGENT_CREDENTIAL.value,
     }
     return any(
         str(item.get("resource_type") or "") in sensitive
@@ -324,6 +339,85 @@ def _create_plan_impact(
     return impact, paused_case_id, human_review_case_id
 
 
+def _recheck_live_resources(
+    db: Session,
+    change: PolicyChange,
+    old_version: PolicyVersion,
+    old_text: str,
+    new_text: str,
+) -> list[PolicyImpact]:
+    """Flag live agent access granted under the old version that breaks a
+    newly added rule. Deterministic: links and rules decide, never the LLM."""
+    rules = newly_added_rules(old_text, new_text)
+    if not rules:
+        return []
+
+    linked_plan_ids = set(
+        db.scalars(
+            select(PolicyLink.subject_id).where(
+                PolicyLink.subject_type == PolicyLinkSubjectType.PLAN,
+                PolicyLink.policy_version_id == old_version.id,
+            )
+        )
+    )
+    if not linked_plan_ids:
+        return []
+
+    resources = list(
+        db.scalars(
+            select(CompanyResource)
+            .join(CaseAction, CaseAction.id == CompanyResource.source_action_id)
+            .where(
+                CaseAction.plan_id.in_(linked_plan_ids),
+                CompanyResource.resource_type.in_(
+                    [
+                        ResourceType.AI_AGENT,
+                        ResourceType.AGENT_CREDENTIAL,
+                        ResourceType.GITHUB_ACCESS,
+                    ]
+                ),
+                CompanyResource.status.in_(list(LIVE_STATES)),
+            )
+        )
+    )
+
+    contexts = []
+    for resource in resources:
+        trainings = db.scalars(
+            select(CompanyResource).where(
+                CompanyResource.person_id == resource.person_id,
+                CompanyResource.resource_type == ResourceType.TRAINING,
+                CompanyResource.status.in_(list(COMPLETED_TRAINING_STATES)),
+            )
+        )
+        contexts.append(
+            ResourceContext(
+                resource=resource,
+                sponsor=db.get(Person, resource.person_id),
+                sponsor_training=frozenset(
+                    str((training.details_data or {}).get("catalog_key"))
+                    for training in trainings
+                ),
+            )
+        )
+
+    impacts = []
+    for finding in evaluate_resources(rules, contexts):
+        impact = PolicyImpact(
+            policy_change_id=change.id,
+            target_type=PolicyImpactTargetType.RESOURCE,
+            target_id=finding.resource.id,
+            risk_level=finding.risk_level,
+            explanation=f"[{finding.rule_id}] {finding.explanation}",
+            recommended_action=finding.recommended_action,
+            status=ImpactState.OPEN,
+        )
+        db.add(impact)
+        impacts.append(impact)
+    db.flush()
+    return impacts
+
+
 def activate_policy_change(
     db: Session,
     request: PolicyActivateRequest,
@@ -451,6 +545,10 @@ def activate_policy_change(
                 paused_case_ids.append(paused_id)
             if review_id:
                 human_review_case_ids.append(review_id)
+
+    impacts.extend(
+        _recheck_live_resources(db, change, old_version, old_text, new_text)
+    )
 
     # Archive V1 first so the unique "one CURRENT per policy" index is safe.
     old_version.status = PolicyState.ARCHIVED

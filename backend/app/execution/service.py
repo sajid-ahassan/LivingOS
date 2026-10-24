@@ -20,6 +20,7 @@ from app.github.keys import generate_public_key
 from app.github.targets import build_github_parameters
 from app.github.verifier import GitHubVerification, verify_github_action
 from app.models import Case, CaseAction, CasePlan, CompanyResource
+from app.policy_guardian.resource_remediation import resolve_remediated_impact
 from app.resource_rules import (
     action_moves_owner,
     successor_from_parameters,
@@ -762,6 +763,7 @@ def _complete_case_if_verified(
     previous_status = case.status
     case.status = CaseState.COMPLETED
     case.failure_reason = None
+    resolve_remediated_impact(db, case)
 
     try:
         record_audit_event(

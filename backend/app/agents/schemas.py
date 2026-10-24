@@ -58,6 +58,8 @@ class AgentNode(BaseModel):
     status: ResourceState
     orphan: bool
     orphan_reasons: list[str]
+    # An open Policy Guardian impact on the agent or its credential.
+    policy_violation: bool = False
 
 
 class WorkforceEdge(BaseModel):

@@ -23,6 +23,10 @@ BASE_POLICY_QUERIES = {
         "Employee offboarding requirements, disable accounts, "
         "revoke access, return equipment, reassign work and handover"
     ),
+    CaseType.ACCESS_REQUEST: (
+        "AI agent access request, repository permission, confidential "
+        "repository, approval, expiry, sponsor accountability"
+    ),
 }
 
 

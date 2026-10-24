@@ -61,9 +61,11 @@ def test_offboarding_allows_only_mutation_actions():
     assert ActionType.GRANT_TEMPORARY not in ALLOWED_ACTIONS[CaseType.OFFBOARDING]
 
 
-def test_access_request_allows_only_temporary_grants():
+def test_access_request_allows_grants_and_guardian_remediation():
     assert ALLOWED_ACTIONS[CaseType.ACCESS_REQUEST] == {
         ActionType.GRANT_TEMPORARY,
+        ActionType.DOWNSCOPE,
+        ActionType.REVOKE,
     }
 
 

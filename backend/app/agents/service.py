@@ -23,8 +23,8 @@ from app.agents.schemas import (
     WorkforceEdge,
     WorkforceGraph,
 )
-from app.enums import ResourceType
-from app.models import CompanyResource, Person
+from app.enums import ImpactState, PolicyImpactTargetType, ResourceType
+from app.models import CompanyResource, Person, PolicyImpact
 from app.offboarding.rules import TERMINAL_RESOURCE_STATES
 from app.resource_rules import AGENT_RESOURCE_TYPES
 
@@ -87,6 +87,7 @@ def build_workforce_graph(
     people: Iterable[Person],
     resources: Iterable[CompanyResource],
     now: datetime,
+    violating_agent_keys: frozenset[str] = frozenset(),
 ) -> WorkforceGraph:
     people = list(people)
     resources = list(resources)
@@ -111,6 +112,7 @@ def build_workforce_graph(
                     status=resource.status,
                     orphan=bool(reasons),
                     orphan_reasons=reasons,
+                    policy_violation=resource.resource_key in violating_agent_keys,
                 )
             )
             edges.append(
@@ -212,7 +214,34 @@ def get_agent_grants(db: Session, resource_key: str) -> list[AgentCredential]:
     ]
 
 
+def violating_agent_keys(
+    impacted: Iterable[CompanyResource],
+) -> frozenset[str]:
+    """Agent keys to highlight: an impacted agent, or the agent that owns an
+    impacted credential."""
+    keys = set()
+    for resource in impacted:
+        if resource.resource_type == ResourceType.AI_AGENT:
+            keys.add(resource.resource_key)
+        elif resource.resource_type == ResourceType.AGENT_CREDENTIAL:
+            agent_key = (resource.details_data or {}).get("agent_key")
+            if agent_key:
+                keys.add(agent_key)
+    return frozenset(keys)
+
+
 def get_workforce_graph(db: Session) -> WorkforceGraph:
     people = db.scalars(select(Person))
-    resources = db.scalars(select(CompanyResource))
-    return build_workforce_graph(people, resources, _now())
+    resources = list(db.scalars(select(CompanyResource)))
+    open_ids = set(
+        db.scalars(
+            select(PolicyImpact.target_id).where(
+                PolicyImpact.target_type == PolicyImpactTargetType.RESOURCE,
+                PolicyImpact.status.in_([ImpactState.OPEN, ImpactState.REMEDIATING]),
+            )
+        )
+    )
+    impacted = [resource for resource in resources if resource.id in open_ids]
+    return build_workforce_graph(
+        people, resources, _now(), violating_agent_keys(impacted)
+    )

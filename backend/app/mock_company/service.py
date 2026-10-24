@@ -372,6 +372,9 @@ def mutate_resource(
         )
         resource.person_id = successor_id
 
+    if request.action_type == ActionType.DOWNSCOPE:
+        updated_details["permission"] = "read"
+
     if request.action_type == ActionType.REQUEST_RETURN:
         if not request.requested_data.get("due_date"):
             raise ValueError(

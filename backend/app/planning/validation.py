@@ -24,8 +24,11 @@ ALLOWED_ACTIONS = {
         ActionType.REQUEST_RETURN,
         ActionType.DOWNSCOPE,
     },
+    # Agent access changes: MCP grants (W5) and Guardian remediation.
     CaseType.ACCESS_REQUEST: {
         ActionType.GRANT_TEMPORARY,
+        ActionType.DOWNSCOPE,
+        ActionType.REVOKE,
     },
 }
 

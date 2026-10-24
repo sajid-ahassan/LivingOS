@@ -10,8 +10,18 @@ from app.policy_guardian.remediation import (
     RemediationNotFoundError,
     regenerate_plan_for_impact,
 )
+from app.policy_guardian.resource_remediation import (
+    ResourceRemediationError,
+    ResourceRemediationNotFoundError,
+    recertify_resource_impact,
+    remediate_resource_impact,
+)
 from app.policy_guardian.schemas import (
     PolicyActivationResponse,
+    ResourceRecertifyRequest,
+    ResourceRecertifyResponse,
+    ResourceRemediationRequest,
+    ResourceRemediationResponse,
     PolicyActivateRequest,
     PolicyChangeDetailResponse,
     RegenerateImpactRequest,
@@ -131,3 +141,61 @@ def regenerate_impacted_plan(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
+
+
+def _resource_remediation_http_error(exc: ResourceRemediationError) -> HTTPException:
+    code = (
+        status.HTTP_404_NOT_FOUND
+        if isinstance(exc, ResourceRemediationNotFoundError)
+        else status.HTTP_409_CONFLICT
+    )
+    return HTTPException(status_code=code, detail=str(exc))
+
+
+@router.post(
+    "/impacts/{impact_id}/remediate",
+    response_model=ResourceRemediationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def remediate_resource(
+    impact_id: UUID,
+    request: ResourceRemediationRequest,
+    db: Session = Depends(get_db),
+) -> ResourceRemediationResponse:
+    """Open the downscope case for a live credential that breaks the new policy."""
+    try:
+        impact, case, plan, approval = remediate_resource_impact(
+            db, impact_id, request.requested_by
+        )
+    except ResourceRemediationError as exc:
+        raise _resource_remediation_http_error(exc) from exc
+    return ResourceRemediationResponse(
+        impact_id=impact.id,
+        impact_status=impact.status,
+        case_id=case.id,
+        plan_id=plan.id,
+        approval_id=approval.id,
+        assigned_to=approval.assigned_to,
+    )
+
+
+@router.post(
+    "/impacts/{impact_id}/recertify",
+    response_model=ResourceRecertifyResponse,
+)
+def recertify_resource(
+    impact_id: UUID,
+    request: ResourceRecertifyRequest,
+    db: Session = Depends(get_db),
+) -> ResourceRecertifyResponse:
+    """IT Owner re-certifies an agent whose sponsor changed."""
+    try:
+        impact, resource = recertify_resource_impact(db, impact_id, request.decided_by)
+    except ResourceRemediationError as exc:
+        raise _resource_remediation_http_error(exc) from exc
+    return ResourceRecertifyResponse(
+        impact_id=impact.id,
+        impact_status=impact.status,
+        resource_key=resource.resource_key,
+        sponsor_id=resource.person_id,
+    )

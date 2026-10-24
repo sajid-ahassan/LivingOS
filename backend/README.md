@@ -79,6 +79,22 @@ Notifications (`app/notifications/service.py`) go to `N8N_NOTIFIER_WEBHOOK`
 when a plan is submitted for approval and when Guardian finds impacts. They
 are best-effort and never fail the business action.
 
+## Policy Guardian and live agent access
+
+Activating a new policy version (`POST /policy-guardian/activate`, e.g. with
+`data/seed/access_policy_v2.md`) still marks linked lessons stale and pauses
+open plans, and now also re-checks live agent access
+(`app/policy_guardian/resource_rules.py`). For every active agent, agent
+credential or GitHub access granted by a plan linked to the old version, the
+clauses that are new in this version are evaluated by code, never by the LLM:
+
+| Rule (Access Policy V2) | Finding | Fix |
+| --- | --- | --- |
+| 7. agent write to a confidential repo needs a sponsor with `SECURITY-CONFIDENTIAL` training | HIGH, `REGENERATE` | `POST /policy-guardian/impacts/{id}/remediate` opens an ACCESS_REQUEST case with one DOWNSCOPE action for the IT Owner to approve; it executes and verifies like any plan, and the impact is RESOLVED when the case completes |
+| 8. a changed sponsor needs IT Owner re-certification | MEDIUM, `REVIEW` | `POST /policy-guardian/impacts/{id}/recertify` by an IT Owner |
+
+`GET /workforce/graph` marks agents with an open impact (`policy_violation`).
+
 ## Demo mode
 
 `DEMO_MODE` in `.env` decides how AI calls and execution behave

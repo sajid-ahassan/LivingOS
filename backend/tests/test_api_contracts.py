@@ -43,6 +43,8 @@ EXPECTED_PATHS = {
     "/agents/{resource_key}/grants",
     "/workforce/graph",
     "/demo/mode",
+    "/policy-guardian/impacts/{impact_id}/remediate",
+    "/policy-guardian/impacts/{impact_id}/recertify",
 }
 
 
