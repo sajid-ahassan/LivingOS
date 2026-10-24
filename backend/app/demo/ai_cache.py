@@ -122,6 +122,9 @@ class DemoLLMCache(BaseCache):
     def _key(self, prompt: str, llm_string: str) -> str:
         return cache_key(normalize_prompt(prompt, self._stable_ids()), llm_string)
 
+    def prompt_preview(self, prompt: str) -> str:
+        return normalize_prompt(prompt, self._stable_ids())
+
     def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         mode = self._mode()
         if mode == "LIVE":
@@ -139,9 +142,14 @@ class DemoLLMCache(BaseCache):
     def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
         if self._mode() == "OFFLINE":
             return
+        # The normalized prompt is stored next to the answer so anyone can see
+        # why a rehearsal hit or missed the cache (fictional demo data only).
         self._store.write(
             self._key(prompt, llm_string),
-            {"generations": dumps(list(return_val))},
+            {
+                "prompt": self.prompt_preview(prompt),
+                "generations": dumps(list(return_val)),
+            },
         )
 
     def clear(self, **kwargs: Any) -> None:

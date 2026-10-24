@@ -25,7 +25,9 @@ from app.mock_company.service import MUTATION_RESOURCE_TYPES
 from app.models import Case, CompanyResource, Person
 from app.offboarding.graph_runner import _validate_execution_plan
 from app.offboarding.rules import (
+    agent_evidence_instruction,
     allowed_offboarding_actions,
+    derive_agent_credential_actions,
     safe_resource_metadata,
     validate_access_evidence,
     validate_agent_coverage,
@@ -494,3 +496,60 @@ def test_planner_sees_agent_metadata_but_no_secrets():
     assert metadata["purpose"]
     assert "mcp_api_key_hash" not in metadata
     assert "key_id" not in safe_resource_metadata(_credential())
+
+
+# Credential actions derived from the planner's agent decision
+
+
+def _llm_plan(agent_action: ActionType, credential_action: ActionType | None):
+    agent = _action(
+        2, agent_action, ResourceType.AI_AGENT, AGENT_KEY,
+        NABIL if agent_action == ActionType.REASSIGN else None,
+    )
+    actions = [_ai_version()[0], agent]
+    if credential_action is not None:
+        actions.append(_action(3, credential_action, ResourceType.AGENT_CREDENTIAL, CREDENTIAL_KEY))
+    revocations = [a for a in actions if a.action_type == ActionType.REVOKE]
+    reassignments = [a for a in actions if a.action_type != ActionType.REVOKE]
+    return _offboarding_plan(revocations, reassignments)
+
+
+def _credential_actions(plan):
+    return [
+        a for a in [*plan.revocations, *plan.reassignments]
+        if a.resource_key == CREDENTIAL_KEY
+    ]
+
+
+def test_reassigned_agent_gets_a_rotated_credential_for_the_same_successor():
+    # The model wrongly revoked the credential of an agent it reassigned.
+    plan = derive_agent_credential_actions(
+        _llm_plan(ActionType.REASSIGN, ActionType.REVOKE), _resources()
+    )
+    [credential] = _credential_actions(plan)
+    assert credential.action_type == ActionType.REASSIGN
+    assert credential.requested_data == {"successor_person_id": str(NABIL.id)}
+    assert credential.evidence_ids == [ACCESS_EVIDENCE, AGENT_EVIDENCE]
+    assert credential in plan.reassignments
+
+
+def test_revoked_agent_gets_a_revoked_credential_even_if_model_forgot_it():
+    plan = derive_agent_credential_actions(_llm_plan(ActionType.REVOKE, None), _resources())
+    [credential] = _credential_actions(plan)
+    assert credential.action_type == ActionType.REVOKE
+    assert credential in plan.revocations
+
+
+def test_derived_plan_passes_validation():
+    for agent_action in (ActionType.REASSIGN, ActionType.REVOKE):
+        plan = derive_agent_credential_actions(_llm_plan(agent_action, None), _resources())
+        for sequence, action in enumerate([*plan.revocations, *plan.reassignments], start=1):
+            action.sequence = sequence
+        assert _graph_errors(plan) == []
+
+
+def test_required_citations_are_named_from_retrieval():
+    text = agent_evidence_instruction(_resources(), _policy_context())
+    assert ACCESS_EVIDENCE in text and AGENT_EVIDENCE in text
+    assert OFFBOARDING_EVIDENCE not in text
+    assert agent_evidence_instruction([_github()], _policy_context()) == ""

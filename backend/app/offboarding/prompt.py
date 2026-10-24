@@ -27,9 +27,9 @@ Execution rules:
 
 AI agent rules (the departing employee is the agent's human sponsor):
 13. Every ACTIVE, ASSIGNED, or SUSPENDED AI_AGENT must have exactly one action: REASSIGN to the successor, or REVOKE. Choose from the policy evidence and the agent's purpose; a manager may change your choice.
-14. Every ACTIVE or ASSIGNED AGENT_CREDENTIAL must have exactly one action. Match it to the agent whose credential_key names it: if the agent is REVOKE, the credential is REVOKE; if the agent is REASSIGN, the credential is REASSIGN or DOWNSCOPE (write to read-only).
-15. REASSIGN and DOWNSCOPE of an agent or credential require the same successor_person_id as the agent's REASSIGN.
-16. Every agent and credential action must cite ACCESS policy evidence, and AGENT policy evidence when it is supplied.
+14. Do not write actions for an AGENT_CREDENTIAL that an agent's credential_key names: LivingOps derives them from your decision for that agent (REVOKE with REVOKE; REASSIGN with a key rotation to the same successor). Decide only the agent.
+15. REASSIGN of an agent requires requested_data.successor_person_id: {{"action_type": "REASSIGN", "resource_type": "AI_AGENT", "resource_key": "agent:x", "requested_data": {{"successor_person_id": "<successor id>"}}}}
+16. Every agent and credential action must cite ACCESS policy evidence, and AGENT policy evidence when it is supplied. Use exactly the IDs listed under REQUIRED CITATIONS in the policy evidence.
 17. Never leave an agent or credential with the departing employee.
 
 Handover rules:

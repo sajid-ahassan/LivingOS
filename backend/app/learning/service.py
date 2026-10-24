@@ -306,31 +306,38 @@ def _normalized_action(action: dict) -> dict:
     }
 
 
-def _action_identity(action: dict) -> tuple[str, str, str]:
-    item = _normalized_action(action)
-    return (
-        item["action_type"],
-        item["resource_type"],
-        item["resource_key"],
-    )
+def _plan_actions(plan_data: dict | None) -> list[dict]:
+    """Actions of either plan shape: GeneratedCasePlan ("actions") or the
+    offboarding planner's buckets (revocations, asset_returns, reassignments)."""
+    data = plan_data or {}
+    if "actions" in data:
+        return list(data.get("actions") or [])
+    return [
+        *(data.get("revocations") or []),
+        *(data.get("asset_returns") or []),
+        *(data.get("reassignments") or []),
+    ]
 
 
 def _structured_revision_diff(parent: CasePlan, revised: CasePlan) -> dict:
+    # Keyed by resource, so "REASSIGN credential -> DOWNSCOPE credential"
+    # reads as one changed step, which is the correction the lesson is about.
     before = {
-        _action_identity(item): _normalized_action(item)
-        for item in (parent.plan_data or {}).get("actions", [])
+        item["resource_key"]: item
+        for item in map(_normalized_action, _plan_actions(parent.plan_data))
     }
     after = {
-        _action_identity(item): _normalized_action(item)
-        for item in (revised.plan_data or {}).get("actions", [])
+        item["resource_key"]: item
+        for item in map(_normalized_action, _plan_actions(revised.plan_data))
     }
 
     added = [after[key] for key in sorted(after.keys() - before.keys())]
     removed = [before[key] for key in sorted(before.keys() - after.keys())]
-    changed = []
-    for key in sorted(before.keys() & after.keys()):
-        if before[key]["requested_data"] != after[key]["requested_data"]:
-            changed.append({"before": before[key], "after": after[key]})
+    changed = [
+        {"before": before[key], "after": after[key]}
+        for key in sorted(before.keys() & after.keys())
+        if before[key] != after[key]
+    ]
 
     return {"added": added, "removed": removed, "changed": changed}
 

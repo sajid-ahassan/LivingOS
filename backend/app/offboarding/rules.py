@@ -286,3 +286,98 @@ def validate_access_evidence(
             )
 
     return errors
+
+
+def agent_evidence_instruction(
+    resources: Iterable[CompanyResource],
+    policy_context: CasePolicyContextResponse,
+) -> str:
+    """Name, from the retrieved evidence, the exact IDs agent steps must cite.
+
+    Deterministic: the IDs come from retrieval, not from the model, so the
+    planner cannot drop the ACCESS link that Policy Guardian depends on.
+    """
+    if not any(resource.resource_type in AGENT_RESOURCE_TYPES for resource in resources):
+        return ""
+    required = [
+        item.evidence_id
+        for code in (ACCESS_POLICY_CODE, AGENT_POLICY_CODE)
+        for item in policy_context.evidence
+        if item.policy_code == code
+    ]
+    if not required:
+        return ""
+    return (
+        "\n\nREQUIRED CITATIONS: every AI_AGENT and AGENT_CREDENTIAL action must "
+        "include all of these evidence IDs in evidence_ids: " + ", ".join(required)
+    )
+
+
+def derive_agent_credential_actions(plan, resources: Iterable[CompanyResource]):
+    """Make each agent's credential follow the planner's decision for the agent.
+
+    The planner decides an agent's fate (REASSIGN or REVOKE); what happens to
+    its credential follows from that by rule, not judgment: REVOKE with
+    REVOKE, REASSIGN with a REASSIGN (key rotation) to the same successor. Any
+    credential action the model wrote for a linked credential is replaced.
+    A manager can still choose DOWNSCOPE in a revision. Returns a new plan.
+    """
+    from app.planning.schemas import PlannedAction
+
+    resources = list(resources)
+    by_key = {resource.resource_key: resource for resource in resources}
+    agent_credentials = {
+        resource.resource_key: (resource.details_data or {}).get("credential_key")
+        for resource in resources
+        if resource.resource_type == ResourceType.AI_AGENT
+        and allowed_offboarding_actions(resource)
+    }
+    linked = {
+        key
+        for key in agent_credentials.values()
+        if key in by_key and allowed_offboarding_actions(by_key[key])
+    }
+
+    def keep(action) -> bool:
+        return action.resource_key not in linked
+
+    revocations = [a for a in plan.revocations if keep(a)]
+    reassignments = [a for a in plan.reassignments if keep(a)]
+
+    for agent_action in [*plan.revocations, *plan.reassignments]:
+        credential_key = agent_credentials.get(agent_action.resource_key)
+        if agent_action.resource_type != ResourceType.AI_AGENT or credential_key not in linked:
+            continue
+        if agent_action.action_type == ActionType.REVOKE:
+            derived = PlannedAction(
+                sequence=agent_action.sequence,
+                action_type=ActionType.REVOKE,
+                resource_type=ResourceType.AGENT_CREDENTIAL,
+                resource_key=credential_key,
+                requested_data={},
+                reason=f"Credential is revoked with its agent {agent_action.resource_key}.",
+                evidence_ids=list(agent_action.evidence_ids),
+            )
+            revocations.append(derived)
+        elif agent_action.action_type == ActionType.REASSIGN:
+            derived = PlannedAction(
+                sequence=agent_action.sequence,
+                action_type=ActionType.REASSIGN,
+                resource_type=ResourceType.AGENT_CREDENTIAL,
+                resource_key=credential_key,
+                requested_data={
+                    "successor_person_id": agent_action.requested_data.get(
+                        "successor_person_id"
+                    )
+                },
+                reason=(
+                    f"Credential moves with its agent {agent_action.resource_key}; "
+                    "the key is rotated for the new sponsor."
+                ),
+                evidence_ids=list(agent_action.evidence_ids),
+            )
+            reassignments.append(derived)
+
+    return plan.model_copy(
+        update={"revocations": revocations, "reassignments": reassignments}
+    )

@@ -16,7 +16,9 @@ from app.models import Case, CompanyResource, Person
 from app.offboarding.prompt import OFFBOARDING_PROMPT
 from app.offboarding.rules import (
     AGENT_RESOURCE_TYPES,
+    agent_evidence_instruction,
     allowed_offboarding_actions,
+    derive_agent_credential_actions,
     required_action_for_resource,
     safe_resource_metadata,
     validate_access_evidence,
@@ -53,7 +55,7 @@ Do not ask for passwords, secrets, private messages, personal files, or
 unrelated personal information.
 
 Return a JSON object with exactly one key:
-{"questions": ["...", "..."]}
+{{"questions": ["...", "..."]}}
 """.strip(),
         ),
         (
@@ -121,7 +123,7 @@ REPAIR_QUESTIONS_PROMPT = ChatPromptTemplate.from_messages(
 Repair the targeted handover questions for a LivingOps offboarding plan.
 
 Return JSON with exactly:
-{"questions": ["...", "..."]}
+{{"questions": ["...", "..."]}}
 
 Fix only the supplied validation errors.
 Questions must remain work-related and must never request passwords, secrets,
@@ -197,7 +199,8 @@ def _base_inputs(
             [safe_resource_metadata(resource) for resource in resources],
             indent=2,
         ),
-        "policy_evidence": format_policy_evidence(policy_context),
+        "policy_evidence": format_policy_evidence(policy_context)
+        + agent_evidence_instruction(resources, policy_context),
     }
 
 
@@ -422,7 +425,9 @@ def generate_offboarding_plan_via_graph(
             )
         )
 
-        plan = OffboardingPlan.model_validate(result)
+        plan = derive_agent_credential_actions(
+            OffboardingPlan.model_validate(result), resources
+        )
 
         # Questions have their own graph node, so ignore any questions the
         # original prompt happened to return here.
@@ -528,7 +533,9 @@ def generate_offboarding_plan_via_graph(
             }
         )
 
-        repaired = OffboardingPlan.model_validate(result)
+        repaired = derive_agent_credential_actions(
+            OffboardingPlan.model_validate(result), resources
+        )
         repaired.targeted_questions = []
 
         for sequence, action in enumerate(
