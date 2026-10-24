@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.demo.ai_cache import install_demo_llm_cache
 from app.demo.routes import router as demo_router
 from app.evidence.routes import router as evidence_router
+from app.views.routes import router as views_router
 from app.database import check_database_connection
 from app.execution.routes import router as execution_router
 from app.handover.routes import router as handover_router
@@ -113,6 +114,7 @@ app.include_router(agents_router)
 app.include_router(demo_router)
 app.include_router(access_requests_router)
 app.include_router(evidence_router)
+app.include_router(views_router)
 
 
 @app.get(

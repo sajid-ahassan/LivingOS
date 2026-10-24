@@ -64,6 +64,12 @@ class Handler(SimpleHTTPRequestHandler):
             return self._proxy()
         self.send_error(405)
 
+    def end_headers(self):
+        # Static pages change between rehearsals; never serve a stale copy.
+        if not self.path.startswith("/api/"):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def log_message(self, fmt, *args):
         print(f"[frontend] {self.address_string()} - {fmt % args}")
 

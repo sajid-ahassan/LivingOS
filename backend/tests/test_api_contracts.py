@@ -54,6 +54,12 @@ EXPECTED_PATHS = {
     "/plans/{plan_id}/explanation",
     "/cases/{case_id}/evidence",
     "/evaluation/latest",
+    "/cases/{case_id}/plans",
+    "/approvals",
+    "/policy-guardian/changes",
+    "/policy-guardian/changes/{change_id}/view",
+    "/dashboard/kpis",
+    "/demo/policies/{policy_code}/v{version}",
 }
 
 

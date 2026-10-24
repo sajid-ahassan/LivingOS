@@ -1,613 +1,270 @@
-const API_BASE = '/api';
-const STORAGE_KEY = 'livingops.trackedCases.v1';
-const WORKSPACE_STORAGE_KEY = 'livingops.workspace.v1';
+/* Case workspace: plan, "why" per step, manager revision, execution with a
+   stopwatch, verification source, timeline and the evidence report. */
+(function () {
+  const { api, esc, badge, toast, timeAgo, human, poll, clock, actingAs, PEOPLE } = LO;
+  const caseId = new URLSearchParams(location.search).get('case');
+  const page = LO.shell({ active: 'cases.html', title: 'Case workspace', subtitle: caseId ? `Case ${caseId}` : 'No case selected' });
+  if (!caseId) { page.innerHTML = '<div class="empty">Open a case from the Dashboard.</div>'; return; }
 
-const $ = (id) => document.getElementById(id);
-
-const PEOPLE = {
-  '11111111-1111-4111-8111-111111111111': { name: 'Farhana Islam', role: 'HR Manager' },
-  '22222222-2222-4222-8222-222222222222': { name: 'Nabil Chowdhury', role: 'Engineering Manager' },
-  '33333333-3333-4333-8333-333333333333': { name: 'Tahmid Hasan', role: 'IT Security Owner' },
-  '44444444-4444-4444-8444-444444444444': { name: 'Amina Rahman', role: 'AI Engineer' },
-  '55555555-5555-4555-8555-555555555555': { name: 'Rafi Ahmed', role: 'AI Engineer' },
-  '66666666-6666-4666-8666-666666666666': { name: 'Arif Hossain', role: 'Senior Software Engineer' },
-};
-
-const state = {
-  caseId: new URLSearchParams(location.search).get('case'),
-  caseItem: null,
-  health: null,
-  evidence: null,
-  audit: null,
-  coverage: null,
-  local: { plan: null, approval: null, execution: null, evidence: null },
-  activeTab: 'overview',
-};
-
-function showToast(message, type = '') {
-  const toast = $('toast');
-  toast.textContent = message;
-  toast.className = `toast show ${type}`.trim();
-  clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => { toast.className = 'toast'; }, 3400);
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  });
-  const text = await response.text();
-  let payload = null;
-  if (text) {
-    try { payload = JSON.parse(text); }
-    catch { payload = { detail: text }; }
-  }
-  if (!response.ok) {
-    const detail = payload?.detail;
-    throw new Error(typeof detail === 'string' ? detail : `Request failed (${response.status})`);
-  }
-  return payload;
-}
-
-function pretty(value) {
-  return String(value || '').toLowerCase().split('_').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-}
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-  }[char]));
-}
-
-function shortId(id) {
-  return `LO-${String(id || '').split('-')[0].toUpperCase()}`;
-}
-
-function formatDate(value, includeTime = true) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString([], includeTime
-    ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
-    : { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function person(id) {
-  return PEOPLE[String(id)] || { name: 'Unknown user', role: 'Employee' };
-}
-
-function getWorkspaceStore() {
-  try {
-    const value = JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) || '{}');
-    return value && typeof value === 'object' ? value : {};
-  } catch {
-    return {};
-  }
-}
-
-function loadLocalState() {
-  const store = getWorkspaceStore();
-  state.local = store[state.caseId] || { plan: null, approval: null, execution: null, evidence: null };
-  state.local.evidence = state.local.evidence || null;
-}
-
-function saveLocalState() {
-  const store = getWorkspaceStore();
-  store[state.caseId] = state.local;
-  localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(store));
-}
-
-function ensureTrackedCase() {
-  try {
-    const ids = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const list = Array.isArray(ids) ? ids : [];
-    if (!list.includes(state.caseId)) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([state.caseId, ...list]));
-    }
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([state.caseId]));
-  }
-}
-
-function openModal(id) { $(id).classList.remove('hidden'); }
-function closeModal(id) { $(id).classList.add('hidden'); }
-
-function setLoading(loading) {
-  $('workspaceLoading').classList.toggle('hidden', !loading);
-  $('workspaceApp').classList.toggle('hidden', loading || !state.caseItem);
-}
-
-function showWorkspaceError(message) {
-  $('workspaceLoading').classList.add('hidden');
-  $('workspaceApp').classList.add('hidden');
-  $('workspaceError').classList.remove('hidden');
-  $('workspaceErrorMessage').textContent = message;
-}
-
-function renderHealth() {
-  const healthy = state.health?.status === 'ok';
-  $('sidebarHealthDot').className = `dot ${healthy ? 'ok' : state.health ? 'bad' : 'neutral'}`;
-  $('sidebarHealthText').textContent = healthy ? 'System operational' : state.health ? 'System degraded' : 'Backend offline';
-  $('sidebarEnv').textContent = state.health?.environment ? `${state.health.environment} environment` : 'LivingOps backend';
-}
-
-function workflowIndex(status) {
-  const map = {
-    NEW: 0,
-    PLANNING: 1,
-    PENDING_APPROVAL: 2,
-    APPROVED: 3,
-    EXECUTING: 4,
-    COMPLETED: 5,
-    FAILED: 4,
-    HUMAN_REVIEW: 2,
-    PAUSED: 2,
-    CANCELLED: 0,
-  };
-  return map[status] ?? 0;
-}
-
-function renderWorkflow() {
-  const labels = ['Created', 'Planning', 'Approval', 'Approved', 'Execution', 'Completed'];
-  const current = workflowIndex(state.caseItem.status);
-  $('workflowSteps').innerHTML = labels.map((label, index) => {
-    const complete = index < current || state.caseItem.status === 'COMPLETED';
-    const active = index === current && state.caseItem.status !== 'COMPLETED';
-    return `<div class="workflow-step ${complete ? 'complete' : ''} ${active ? 'active' : ''}">
-      <div class="workflow-node">${complete ? '✓' : index + 1}</div>
-      <span>${escapeHtml(label)}</span>
-      ${index < labels.length - 1 ? '<i></i>' : ''}
-    </div>`;
-  }).join('');
-
-  const captions = {
-    NEW: 'Case intake created',
-    PLANNING: 'Ready for policy-grounded planning',
-    PENDING_APPROVAL: 'Waiting for a human decision',
-    APPROVED: 'Approved and ready for execution',
-    EXECUTING: 'Actions are being dispatched and verified',
-    COMPLETED: 'All required actions are verified',
-    FAILED: 'Execution requires attention',
-    HUMAN_REVIEW: 'Human review is required',
-    PAUSED: 'Case paused by governance controls',
-    CANCELLED: 'Case cancelled',
-  };
-  $('workflowCaption').textContent = captions[state.caseItem.status] || 'Operational workflow';
-}
-
-function renderHeader() {
-  const c = state.caseItem;
-  const p = person(c.subject_person_id);
-  $('headerCaseId').textContent = shortId(c.id);
-  $('headerCaseType').textContent = pretty(c.case_type);
-  $('headerPerson').textContent = p.name;
-  $('headerRole').textContent = p.role;
-  $('headerStatus').textContent = pretty(c.status);
-  $('headerStatus').className = `case-status ${c.status}`;
-  $('headerPriority').textContent = pretty(c.priority);
-  $('headerUpdated').textContent = formatDate(c.updated_at);
-  document.title = `${shortId(c.id)} · LivingOps AI`;
-}
-
-function renderFacts() {
-  const facts = state.caseItem.case_facts || {};
-  const entries = Object.entries(facts);
-  $('factsGrid').innerHTML = entries.length
-    ? entries.map(([key, value]) => `<div class="fact-item"><span>${escapeHtml(pretty(key))}</span><strong>${escapeHtml(typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value)}</strong></div>`).join('')
-    : '<div class="workspace-empty-inline">No structured case facts were recorded.</div>';
-}
-
-function renderOverview() {
-  const c = state.caseItem;
-  const subject = person(c.subject_person_id);
-  const creator = person(c.created_by_id);
-  $('employeeInitials').textContent = subject.name.split(' ').map((part) => part[0]).join('').slice(0, 2);
-  $('employeeName').textContent = subject.name;
-  $('employeeRole').textContent = subject.role;
-  $('employeeId').textContent = c.subject_person_id;
-  $('overviewType').textContent = pretty(c.case_type);
-  $('createdByName').textContent = creator.name;
-  $('overviewCreated').textContent = formatDate(c.created_at);
-  renderFacts();
-  renderNextStep();
-  renderRecentActivity();
-}
-
-function renderNextStep() {
-  const c = state.caseItem;
-  let title = 'Review case state';
-  let text = 'Use the workspace tabs to inspect the current case context.';
-  let action = '';
-  if (c.status === 'PLANNING' && !state.local.plan) {
-    title = 'Generate the operational plan';
-    text = 'Retrieve current policy evidence and create a deterministically validated plan.';
-    action = '<button class="primary-button" data-next-action="generate">Generate Plan</button>';
-  } else if (c.status === 'PLANNING' && state.local.plan) {
-    title = 'Submit the plan for approval';
-    text = 'The plan is available and can now enter the human approval checkpoint.';
-    action = '<button class="primary-button" data-next-action="submit">Submit for Approval</button>';
-  } else if (c.status === 'PENDING_APPROVAL') {
-    title = 'Human approval is pending';
-    text = 'The assigned manager must approve or reject the plan before execution.';
-    action = state.local.approval ? '<button class="primary-button" data-next-action="decision">Review Approval</button>' : '';
-  } else if (c.status === 'APPROVED') {
-    title = 'Execute the approved plan';
-    text = 'Dispatch approved actions through automation and independently verify the resulting resources.';
-    action = '<button class="primary-button" data-next-action="execute">Execute Plan</button>';
-  } else if (c.status === 'FAILED') {
-    title = 'Retry failed execution';
-    text = 'Retry is bounded by the backend reliability policy and action attempt limit.';
-    action = '<button class="primary-button" data-next-action="retry">Retry Failed Actions</button>';
-  } else if (c.status === 'COMPLETED') {
-    title = 'Operation completed';
-    text = 'The case reached a verified terminal state. Review the audit tab for the complete trace.';
-    action = '<button class="secondary-button" data-open-tab="audit">View Audit Trail</button>';
-  } else if (['HUMAN_REVIEW', 'PAUSED'].includes(c.status)) {
-    title = 'Human attention required';
-    text = c.failure_reason || 'Governance controls require a human review before the workflow can continue.';
-  }
-  $('nextStepCard').innerHTML = `<div class="next-step-icon">→</div><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>${action}`;
-  document.querySelectorAll('[data-next-action]').forEach((button) => button.addEventListener('click', () => runNamedAction(button.dataset.nextAction)));
-  document.querySelectorAll('[data-open-tab]').forEach((button) => button.addEventListener('click', () => setActiveTab(button.dataset.openTab)));
-}
-
-function renderRecentActivity() {
-  const events = state.audit?.events || [];
-  if (!events.length) {
-    $('recentActivity').innerHTML = '<div class="workspace-empty-inline">No audit events available yet.</div>';
-    return;
-  }
-  $('recentActivity').innerHTML = [...events].slice(-4).reverse().map((event) => `<div class="mini-timeline-row"><span class="timeline-dot"></span><div><strong>${escapeHtml(pretty(event.event_type))}</strong><span>${escapeHtml(formatDate(event.occurred_at))}</span></div></div>`).join('');
-}
-
-function normalizePlanActions(plan) {
-  const data = plan?.plan_data || {};
-  if (Array.isArray(data.actions)) return data.actions;
-  const groups = ['revocations', 'asset_returns', 'reassignments'];
-  return groups.flatMap((key) => Array.isArray(data[key]) ? data[key] : []);
-}
-
-function renderPlan() {
-  const plan = state.local.plan;
-  $('planTabDot').classList.toggle('hidden', !plan);
-  if (!plan) {
-    $('planEmpty').classList.remove('hidden');
-    $('planContent').classList.add('hidden');
-    renderApprovalState();
-    return;
-  }
-  $('planEmpty').classList.add('hidden');
-  $('planContent').classList.remove('hidden');
-  $('planSummary').textContent = plan.summary || plan.plan_data?.summary || 'Generated operational plan';
-  $('planRevision').textContent = plan.revision ?? '—';
-  $('planIdShort').textContent = String(plan.id || '').slice(0, 8) || '—';
-  $('planCreated').textContent = formatDate(plan.created_at);
-  $('planStateBadge').textContent = pretty(plan.status || 'DRAFT');
-  $('planStateBadge').className = `plan-state-badge ${plan.status || 'DRAFT'}`;
-
-  const actions = normalizePlanActions(plan);
-  $('actionCountLabel').textContent = `${actions.length} action${actions.length === 1 ? '' : 's'}`;
-  $('planActions').innerHTML = actions.length ? actions.map((action, index) => {
-    const execution = (state.local.execution?.actions || []).find((item) => item.action_type === action.action_type && item.resource_type === action.resource_type) || null;
-    const actionStatus = execution?.status || 'PENDING';
-    return `<article class="plan-action-card">
-      <div class="action-sequence">${action.sequence || index + 1}</div>
-      <div class="action-main">
-        <div class="action-title-row"><strong>${escapeHtml(pretty(action.action_type))} ${escapeHtml(pretty(action.resource_type))}</strong><span class="action-state ${escapeHtml(actionStatus)}">${escapeHtml(pretty(actionStatus))}</span></div>
-        <span class="action-resource">${escapeHtml(action.resource_key || 'Resource')}</span>
-        <p>${escapeHtml(action.reason || 'Validated operational action.')}</p>
-        <div class="evidence-chip-row">${(action.evidence_ids || []).map((id) => `<span class="evidence-chip">${escapeHtml(id)}</span>`).join('')}</div>
+  page.innerHTML = `
+    <section class="card" id="header"></section>
+    <section class="split">
+      <div class="stack">
+        <div class="card" id="plan"></div>
+        <div class="card hidden" id="editor"></div>
       </div>
-      <div class="action-data"><span>Requested data</span><pre>${escapeHtml(JSON.stringify(action.requested_data || {}, null, 2))}</pre></div>
-    </article>`;
-  }).join('') : '<div class="workspace-empty-inline roomy">No executable actions were included in this plan.</div>';
+      <div class="stack">
+        <div class="card" id="actions"></div>
+        <div class="card"><div class="card-head"><h2>Timeline</h2></div><div id="timeline" class="stack"></div></div>
+      </div>
+    </section>`;
 
-  const data = plan.plan_data || {};
-  const extras = $('offboardingExtras');
-  if (state.caseItem.case_type === 'OFFBOARDING' && ((data.targeted_questions || []).length || (data.handover_topics || []).length)) {
-    extras.classList.remove('hidden');
-    $('offboardingExtraContent').innerHTML = `<div class="offboarding-extra-grid">
-      <div><span class="section-label">TARGETED QUESTIONS</span>${(data.targeted_questions || []).map((q) => `<div class="question-item">${escapeHtml(q)}</div>`).join('') || '<div class="workspace-empty-inline">No targeted questions.</div>'}</div>
-      <div><span class="section-label">HANDOVER TOPICS</span>${(data.handover_topics || []).map((q) => `<div class="topic-item">${escapeHtml(q)}</div>`).join('') || '<div class="workspace-empty-inline">No handover topics.</div>'}</div>
-    </div>`;
-  } else {
-    extras.classList.add('hidden');
+  const state = { data: null, explanations: {}, open: new Set(), busy: false, editing: false };
+  const AGENT_OPTIONS = {
+    AI_AGENT: ['REASSIGN', 'REVOKE'],
+    AGENT_CREDENTIAL: ['REASSIGN', 'DOWNSCOPE', 'REVOKE'],
+  };
+
+  const latestPlan = () => state.data?.plans.at(-1);
+  const executedPlan = () => [...(state.data?.plans || [])].reverse()
+    .find((p) => p.actions.some((a) => a.status !== 'SKIPPED' && a.status !== 'PENDING')) || latestPlan();
+
+  // ---------- Header with stopwatch ----------
+  function renderHeader() {
+    const c = state.data.case;
+    const plan = executedPlan();
+    const verified = (plan?.actions || []).map((a) => a.verified_at).filter(Boolean).map((t) => new Date(t).getTime());
+    const done = c.status === 'COMPLETED' && verified.length;
+    const end = done ? Math.max(...verified) : Date.now();
+    const elapsed = end - new Date(c.created_at).getTime();
+    document.getElementById('header').innerHTML = `
+      <div class="card-head">
+        <div style="flex:1;min-width:0">
+          <h1>${esc(c.subject_name)} · ${esc(human(c.case_type))}</h1>
+          <div class="faint">opened by ${esc(c.created_by_name || '—')} ${timeAgo(c.created_at)}
+            ${c.case_facts.last_working_day ? ` · last working day ${esc(c.case_facts.last_working_day)}` : ''}
+            ${c.origin ? ` · ${esc(human(c.origin))}` : ''}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="faint">${done ? 'All access closed in' : 'Since case opened'}</div>
+          <div class="stopwatch ${done ? 'done' : 'running'}">${clock(elapsed)}</div>
+        </div>
+        ${badge(c.status)}
+      </div>
+      ${c.failure_reason ? `<div class="item highlight">${esc(c.failure_reason)}</div>` : ''}`;
   }
-  renderApprovalState();
-}
 
-function renderApprovalState() {
-  const approval = state.local.approval;
-  const box = $('approvalStateBox');
-  if (!state.local.plan) {
-    box.innerHTML = '<div class="approval-empty"><span class="approval-icon">○</span><div><strong>No plan yet</strong><p>Generate a plan before requesting human approval.</p></div></div>';
-    return;
-  }
-  if (!approval) {
-    box.innerHTML = '<div class="approval-empty"><span class="approval-icon">○</span><div><strong>Not submitted</strong><p>The current draft has not entered the approval checkpoint.</p></div></div>';
-    return;
-  }
-  const approver = person(approval.assigned_to);
-  box.innerHTML = `<div class="approval-state-row"><span class="approval-icon ${approval.status}">${approval.status === 'APPROVED' ? '✓' : approval.status === 'REJECTED' ? '×' : '…'}</span><div><strong>${escapeHtml(pretty(approval.status))}</strong><p>Assigned to ${escapeHtml(approver.name)}</p>${approval.comment ? `<span class="approval-comment">${escapeHtml(approval.comment)}</span>` : ''}</div></div>${approval.status === 'PENDING' ? '<button class="secondary-button approval-review-button" id="reviewApprovalButton">Review Decision</button>' : ''}`;
-  $('reviewApprovalButton')?.addEventListener('click', () => openModal('decisionModal'));
-}
-
-function renderEvidence() {
-  const evidence = state.evidence?.evidence || [];
-  $('evidenceCountBadge').textContent = evidence.length;
-  $('evidenceQuery').textContent = state.evidence?.search_query ? `Search query: ${state.evidence.search_query}` : 'Retrieved policy context for this case.';
-  $('evidenceList').innerHTML = evidence.length ? evidence.map((item, index) => `<article class="evidence-card">
-    <div class="evidence-card-top"><div><span class="evidence-number">${index + 1}</span><strong>${escapeHtml(item.policy_code)} · V${escapeHtml(item.version_number)}</strong></div><span class="evidence-score">${Math.round(Number(item.score || 0) * 100)}% match</span></div>
-    <p>${escapeHtml(item.text)}</p>
-    <div class="evidence-footer"><span>Evidence ID</span><code>${escapeHtml(item.evidence_id)}</code></div>
-  </article>`).join('') : '<div class="workspace-empty roomy"><div class="workspace-empty-icon">EV</div><strong>No policy evidence available</strong><span>Evidence is available while the case is in a planning-compatible state.</span></div>';
-}
-
-function renderExecution() {
-  const execution = state.local.execution;
-  const actions = execution?.actions || [];
-  const verified = actions.filter((item) => item.status === 'VERIFIED').length;
-  const attention = actions.filter((item) => ['FAILED', 'HUMAN_REVIEW'].includes(item.status)).length;
-  $('execTotal').textContent = actions.length || normalizePlanActions(state.local.plan).length;
-  $('execVerified').textContent = verified;
-  $('execAttention').textContent = attention;
-  $('executionCountBadge').textContent = actions.length;
-  $('executionCaseState').textContent = pretty(execution?.case_status || state.caseItem.status);
-  $('executionCaseState').className = `case-status ${execution?.case_status || state.caseItem.status}`;
-
-  if (!actions.length) {
-    const planned = normalizePlanActions(state.local.plan);
-    if (!planned.length) {
-      $('executionList').innerHTML = '<div class="workspace-empty roomy"><div class="workspace-empty-icon">EX</div><strong>No execution data yet</strong><span>Generate and approve a plan before execution.</span></div>';
+  // ---------- Plan and why panel ----------
+  function renderPlan() {
+    const plan = executedPlan();
+    const el = document.getElementById('plan');
+    if (!plan) {
+      el.innerHTML = '<div class="card-head"><h2>Plan</h2></div><div class="empty">No plan yet.</div>';
       return;
     }
-    $('executionList').innerHTML = planned.map((action, index) => `<div class="execution-row"><span class="execution-index">${index + 1}</span><div class="execution-copy"><strong>${escapeHtml(pretty(action.action_type))} ${escapeHtml(pretty(action.resource_type))}</strong><span>${escapeHtml(action.resource_key || 'Resource')}</span></div><span class="action-state PENDING">Pending</span><span class="execution-attempts">0 attempts</span></div>`).join('');
-    return;
+    const revised = plan.parent_plan_id;
+    el.innerHTML = `
+      <div class="card-head"><h2>Plan r${plan.revision}</h2>${badge(plan.status)}
+        ${revised ? '<span class="badge pending">manager revision</span>' : '<span class="badge agent">AI plan</span>'}
+        <span class="spacer"></span><span class="faint">${plan.actions.length} steps</span></div>
+      <p class="muted" style="margin-top:0">${esc(plan.summary || '')}</p>
+      ${plan.correction_summary ? `<div class="item"><b>Manager correction:</b> ${esc(plan.correction_summary)}</div>` : ''}
+      <div class="stack" style="margin-top:12px">${plan.actions.map((a) => stepHtml(plan, a)).join('')}</div>
+      ${plan.targeted_questions.length ? `<h3 style="margin-top:16px">Handover questions</h3>
+        <ol class="muted">${plan.targeted_questions.map((q) => `<li>${esc(q)}</li>`).join('')}</ol>` : ''}`;
+    el.querySelectorAll('[data-why]').forEach((b) => b.addEventListener('click', () => toggleWhy(plan.id, Number(b.dataset.why))));
   }
 
-  $('executionList').innerHTML = actions.map((action, index) => `<div class="execution-row ${['FAILED','HUMAN_REVIEW'].includes(action.status) ? 'needs-attention' : ''}">
-    <span class="execution-index">${index + 1}</span>
-    <div class="execution-copy"><strong>${escapeHtml(pretty(action.action_type))} ${escapeHtml(pretty(action.resource_type))}</strong><span>${action.error_message ? escapeHtml(action.error_message) : action.verification_data ? 'Independent verification recorded' : 'Automation result recorded'}</span></div>
-    <span class="action-state ${escapeHtml(action.status)}">${escapeHtml(pretty(action.status))}</span>
-    <span class="execution-attempts">${Number(action.attempt_count || 0)} attempt${Number(action.attempt_count || 0) === 1 ? '' : 's'}</span>
-  </div>`).join('');
-}
-
-function renderAudit() {
-  const events = state.audit?.events || [];
-  $('auditCountBadge').textContent = events.length;
-  $('auditTimeline').innerHTML = events.length ? [...events].reverse().map((event) => `<article class="audit-event">
-    <div class="audit-rail"><span></span></div>
-    <div class="audit-event-body"><div class="audit-event-head"><strong>${escapeHtml(pretty(event.event_type))}</strong><time>${escapeHtml(formatDate(event.occurred_at))}</time></div><div class="audit-event-meta"><span>${escapeHtml(pretty(event.actor_type))}</span><span>${escapeHtml(pretty(event.entity_type))}</span></div>${event.evidence_data ? `<details><summary>Evidence</summary><pre>${escapeHtml(JSON.stringify(event.evidence_data, null, 2))}</pre></details>` : ''}</div>
-  </article>`).join('') : '<div class="workspace-empty roomy"><div class="workspace-empty-icon">AU</div><strong>No audit events found</strong><span>The audit trail will populate as this case progresses.</span></div>';
-
-  const coverage = state.coverage;
-  if (!coverage) {
-    $('auditCoverage').innerHTML = '<div class="workspace-empty-inline roomy">Coverage could not be loaded.</div>';
-    return;
+  function stepHtml(plan, a) {
+    const key = `${plan.id}:${a.sequence}`;
+    const open = state.open.has(key);
+    const why = open ? whyHtml(plan.id, a.sequence) : '';
+    return `<div class="item">
+      <div class="step">
+        <div class="num">${a.sequence}</div>
+        <div><div class="what">${esc(human(a.action_type))} · ${esc(human(a.resource_type))}</div>
+          <div class="key">${esc(a.resource_key)}</div>
+          <div class="faint">${esc(a.reason || '')}</div>
+          ${a.verified_by ? `<div class="faint">verified by ${esc(a.verified_by === 'github' ? 'GitHub API (backend read-only token)' : 'company records')}
+            ${a.n8n_execution_id ? ` · n8n run ${esc(a.n8n_execution_id)}` : ''}${a.verified_at ? ` · ${new Date(a.verified_at).toLocaleTimeString()}` : ''}</div>` : ''}
+          ${a.error ? `<div class="faint" style="color:var(--bad)">${esc(a.error)}</div>` : ''}
+        </div>
+        <div class="btn-row">${badge(a.status)}<button class="btn small" data-why="${a.sequence}">${open ? 'Hide why' : 'Why?'}</button></div>
+      </div>${why}</div>`;
   }
-  const groups = Object.entries(coverage.present_groups || {});
-  $('auditCoverage').innerHTML = `<div class="coverage-status ${coverage.complete_for_current_case_state ? 'complete' : 'partial'}"><span>${coverage.complete_for_current_case_state ? '✓' : '!'}</span><div><strong>${coverage.complete_for_current_case_state ? 'Coverage complete' : 'Coverage in progress'}</strong><p>${coverage.total_events} audit event${coverage.total_events === 1 ? '' : 's'} recorded</p></div></div><div class="coverage-groups">${groups.map(([name, present]) => `<div class="coverage-row"><span>${escapeHtml(pretty(name))}</span><strong class="${present ? 'yes' : 'no'}">${present ? '✓' : '—'}</strong></div>`).join('')}</div>${(coverage.missing_groups || []).length ? `<div class="missing-coverage"><span>Expected later</span>${coverage.missing_groups.map((name) => `<strong>${escapeHtml(pretty(name))}</strong>`).join('')}</div>` : ''}`;
-}
 
-function renderButtons() {
-  const c = state.caseItem;
-  const plan = state.local.plan;
-  const approval = state.local.approval;
-  const generate = $('generatePlanButton');
-  const submit = $('submitPlanButton');
-  const execute = $('executePlanButton');
-  const retry = $('retryPlanButton');
-
-  generate.classList.toggle('hidden', c.status !== 'PLANNING' || Boolean(plan));
-  submit.classList.toggle('hidden', c.status !== 'PLANNING' || !plan || Boolean(approval));
-  execute.classList.toggle('hidden', c.status !== 'APPROVED' || !plan);
-  retry.classList.toggle('hidden', c.status !== 'FAILED' || !plan);
-}
-
-function renderAll() {
-  if (!state.caseItem) return;
-  renderHealth();
-  renderHeader();
-  renderWorkflow();
-  renderOverview();
-  renderPlan();
-  renderEvidence();
-  renderExecution();
-  renderAudit();
-  renderButtons();
-}
-
-async function loadEvidence() {
-  try {
-    state.evidence = await api(`/cases/${state.caseId}/policy-context`);
-    state.local.evidence = state.evidence;
-    saveLocalState();
-  } catch {
-    state.evidence = state.local.evidence || null;
+  async function toggleWhy(planId, sequence) {
+    const key = `${planId}:${sequence}`;
+    if (state.open.has(key)) { state.open.delete(key); renderPlan(); return; }
+    state.open.add(key);
+    if (!state.explanations[planId]) {
+      try { state.explanations[planId] = await api(`/plans/${planId}/explanation`); }
+      catch (error) { toast(error.message, 'error'); }
+    }
+    renderPlan();
   }
-  renderEvidence();
-}
 
-async function loadAudit() {
-  const [timelineResult, coverageResult] = await Promise.allSettled([
-    api(`/audit/cases/${state.caseId}/timeline`),
-    api(`/audit/cases/${state.caseId}/coverage`),
-  ]);
-  state.audit = timelineResult.status === 'fulfilled' ? timelineResult.value : null;
-  state.coverage = coverageResult.status === 'fulfilled' ? coverageResult.value : null;
-  renderAudit();
-  renderRecentActivity();
-}
-
-async function refreshCase() {
-  state.caseItem = await api(`/cases/${state.caseId}`);
-  ensureTrackedCase();
-}
-
-async function refreshWorkspace(silent = false) {
-  if (!state.caseId) {
-    showWorkspaceError('No case ID was supplied. Open a case from the Cases page.');
-    return;
+  function whyHtml(planId, sequence) {
+    const exp = state.explanations[planId];
+    const step = exp?.steps.find((s) => s.sequence === sequence);
+    if (!step) return '<div class="why faint">Loading…</div>';
+    const validation = exp.validation || {};
+    const policies = step.policy_evidence.map((p) => `
+      <div><div class="chips"><span class="chip">${esc(p.evidence_id)}</span>${badge(p.status || 'ARCHIVED', `${p.policy_code} V${p.version_number} ${human(p.status || '')}`)}</div>
+        ${p.clauses.map((c) => `<div class="clause"><span class="n">${c.number}.</span>${esc(c.text)}</div>`).join('')}</div>`).join('');
+    const lessons = step.lessons.map((l) => `<div class="ai-note"><b>Approved lesson</b><br>${esc(l.recommended_action || l.learning_id)} ${badge(l.status)}</div>`).join('');
+    return `<div class="why">
+      <div class="chips">
+        ${badge('VERIFIED', `validation ${validation.deterministic_validation || 'passed'}`)}
+        ${validation.repair_used === true ? badge('MEDIUM', 'needed one repair') : validation.repair_used === false ? badge('ACTIVE', 'valid first time') : ''}
+        ${badge(exp.origin === 'AI_PLANNER' ? 'PENDING' : 'ACTIVE', human(exp.origin))}
+      </div>
+      <div><h3>Policy evidence</h3>${policies || '<div class="faint">No policy evidence cited.</div>'}</div>
+      ${lessons ? `<div><h3>Lessons used</h3>${lessons}</div>` : ''}
+      <div class="faint">Reason: ${esc(step.reason || '—')}</div>
+    </div>`;
   }
-  if (!silent) setLoading(true);
-  try {
-    const [healthResult] = await Promise.allSettled([api('/health')]);
-    state.health = healthResult.status === 'fulfilled' ? healthResult.value : null;
-    await refreshCase();
-    await Promise.all([loadEvidence(), loadAudit()]);
-    renderAll();
-    $('workspaceError').classList.add('hidden');
-    setLoading(false);
-  } catch (error) {
-    showWorkspaceError(error.message || 'The case could not be loaded.');
-  }
-}
 
-async function generatePlan() {
-  const button = $('generatePlanButton');
-  const emptyButton = $('emptyGeneratePlanButton');
-  [button, emptyButton].forEach((item) => { item.disabled = true; item.textContent = 'Generating…'; });
-  try {
-    const path = state.caseItem.case_type === 'OFFBOARDING'
-      ? `/cases/${state.caseId}/offboarding/plan`
-      : `/cases/${state.caseId}/plan`;
-    const plan = await api(path, { method: 'POST', body: '{}' });
-    state.local.plan = plan;
-    state.local.approval = null;
-    state.local.execution = null;
-    saveLocalState();
-    await refreshCase();
-    await Promise.all([loadEvidence(), loadAudit()]);
-    renderAll();
-    setActiveTab('plan');
-    showToast('Policy-grounded plan generated and validated.', 'success');
-  } catch (error) {
-    showToast(error.message || 'Plan generation failed.', 'error');
-  } finally {
-    button.disabled = false; button.textContent = state.caseItem?.case_type === 'OFFBOARDING' ? 'Generate Offboarding Plan' : 'Generate Plan';
-    emptyButton.disabled = false; emptyButton.textContent = 'Generate Plan';
+  // ---------- Revision editor (manager correction) ----------
+  function renderEditor() {
+    const el = document.getElementById('editor');
+    const plan = latestPlan();
+    el.classList.toggle('hidden', !state.editing || !plan);
+    if (!state.editing || !plan) return;
+    el.innerHTML = `
+      <div class="card-head"><h2>Revise as manager</h2><span class="spacer"></span><span class="faint">Acting as ${esc(actingAs().name)}</span></div>
+      <div class="stack">${plan.actions.map((a) => {
+        const options = AGENT_OPTIONS[a.resource_type];
+        return `<div class="step"><div class="num">${a.sequence}</div>
+          <div><div class="key">${esc(a.resource_key)}</div><div class="faint">${esc(human(a.resource_type))}</div></div>
+          <div>${options ? `<select data-seq="${a.sequence}">${options.map((o) => `<option ${o === a.action_type ? 'selected' : ''}>${o}</option>`).join('')}</select>` : `<span class="faint">${esc(human(a.action_type))}</span>`}</div></div>`;
+      }).join('')}</div>
+      <label class="faint" style="display:block;margin-top:12px">What you changed and why (this becomes the lesson)</label>
+      <textarea id="correction" placeholder="e.g. Keep Aurora Release Bot with me, but read-only: it should not keep write access after its sponsor leaves."></textarea>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn primary" id="save-revision">Save revision and send for approval</button>
+        <button class="btn" id="cancel-revision">Cancel</button></div>`;
+    el.querySelector('#cancel-revision').addEventListener('click', () => { state.editing = false; render(); });
+    el.querySelector('#save-revision').addEventListener('click', saveRevision);
   }
-}
 
-async function submitApproval(event) {
-  event.preventDefault();
-  if (!state.local.plan?.id) return showToast('Generate a plan first.', 'error');
-  const button = $('approvalSubmitButton');
-  button.disabled = true; button.textContent = 'Submitting…';
-  try {
-    const approval = await api(`/plans/${state.local.plan.id}/submit`, {
-      method: 'POST',
-      body: JSON.stringify({ assigned_to: $('assignedApprover').value }),
+  async function saveRevision() {
+    const plan = latestPlan();
+    const facts = state.data.case.case_facts;
+    const successor = facts.successor_person_id || facts.manager_id;
+    const choice = Object.fromEntries([...document.querySelectorAll('#editor select[data-seq]')].map((s) => [s.dataset.seq, s.value]));
+    const actions = plan.actions.map((a) => {
+      const type = choice[a.sequence] || a.action_type;
+      let params = { ...a.parameters };
+      if (AGENT_OPTIONS[a.resource_type]) {
+        params = type === 'REVOKE' ? {} : { successor_person_id: successor };
+        if (type === 'DOWNSCOPE') params.permission = 'read';
+      }
+      return {
+        sequence: a.sequence, action_type: type, resource_type: a.resource_type, resource_key: a.resource_key,
+        requested_data: params, evidence_ids: a.evidence_ids,
+        reason: type === a.action_type ? a.reason : `${a.reason || ''} Manager correction: ${human(type)}.`.trim().slice(0, 500),
+      };
     });
-    state.local.approval = approval;
-    if (state.local.plan) state.local.plan.status = 'PENDING_APPROVAL';
-    saveLocalState();
-    closeModal('approvalModal');
-    await refreshCase();
-    await loadAudit();
-    renderAll();
-    showToast('Plan submitted for human approval.', 'success');
-  } catch (error) {
-    showToast(error.message || 'Could not submit the plan.', 'error');
-  } finally {
-    button.disabled = false; button.textContent = 'Submit Plan';
-  }
-}
-
-async function decideApproval(event) {
-  event.preventDefault();
-  const approval = state.local.approval;
-  if (!approval?.id) return showToast('No pending approval is loaded.', 'error');
-  const decision = $('approvalDecision').value;
-  const comment = $('approvalComment').value.trim();
-  if (decision === 'REJECTED' && !comment) return showToast('A rejection comment is required.', 'error');
-  const button = $('decisionSubmitButton');
-  button.disabled = true; button.textContent = 'Saving…';
-  try {
-    const updated = await api(`/approvals/${approval.id}/decision`, {
-      method: 'POST',
-      body: JSON.stringify({ decided_by: approval.assigned_to, decision, comment: comment || null }),
+    const correction = document.getElementById('correction').value.trim();
+    if (correction.length < 10) { toast('Describe the correction (at least 10 characters).', 'error'); return; }
+    await act(async () => {
+      await api(`/plans/${plan.id}/revise`, { method: 'POST', body: {
+        plan_data: { summary: plan.summary || 'Manager revision', actions, warnings: [] },
+        correction_summary: correction,
+      } });
+      state.editing = false;
+      toast('Revision saved and sent to the manager for approval.');
     });
-    state.local.approval = updated;
-    if (state.local.plan) state.local.plan.status = decision === 'APPROVED' ? 'APPROVED' : 'REJECTED';
-    saveLocalState();
-    closeModal('decisionModal');
-    await refreshCase();
-    await loadAudit();
-    renderAll();
-    showToast(decision === 'APPROVED' ? 'Plan approved.' : 'Plan rejected and routed to human review.', decision === 'APPROVED' ? 'success' : 'error');
-  } catch (error) {
-    showToast(error.message || 'Could not save the approval decision.', 'error');
-  } finally {
-    button.disabled = false; button.textContent = 'Save Decision';
   }
-}
 
-async function executePlan(retry = false) {
-  if (!state.local.plan?.id) return showToast('No plan is loaded for this case.', 'error');
-  const button = retry ? $('retryPlanButton') : $('executePlanButton');
-  const original = button.textContent;
-  button.disabled = true; button.textContent = retry ? 'Retrying…' : 'Executing…';
-  try {
-    const execution = await api(`/plans/${state.local.plan.id}/${retry ? 'retry' : 'execute'}`, { method: 'POST', body: '{}' });
-    state.local.execution = execution;
-    saveLocalState();
-    await refreshCase();
-    await loadAudit();
-    renderAll();
-    setActiveTab('execution');
-    showToast(execution.case_status === 'COMPLETED' ? 'Plan executed and all actions verified.' : 'Execution state updated.', 'success');
-  } catch (error) {
-    try { await refreshCase(); } catch (_) {}
-    await loadAudit();
-    renderAll();
-    setActiveTab('execution');
-    showToast(error.message || 'Execution failed.', 'error');
-  } finally {
-    button.disabled = false; button.textContent = original;
+  // ---------- Context actions ----------
+  async function act(fn) {
+    if (state.busy) return;
+    state.busy = true; renderActions();
+    try { await fn(); await load(); } catch (error) { toast(error.message, 'error'); }
+    finally { state.busy = false; renderActions(); }
   }
-}
 
-function runNamedAction(action) {
-  if (action === 'generate') return generatePlan();
-  if (action === 'submit') return openModal('approvalModal');
-  if (action === 'decision') return openModal('decisionModal');
-  if (action === 'execute') return executePlan(false);
-  if (action === 'retry') return executePlan(true);
-}
+  function renderActions() {
+    const el = document.getElementById('actions');
+    if (!state.data) return;
+    const c = state.data.case;
+    const plan = latestPlan();
+    const pending = plan?.approvals.find((a) => a.status === 'PENDING');
+    const me = actingAs();
+    const buttons = [];
+    if (['NEW', 'HUMAN_REVIEW'].includes(c.status) && !plan) buttons.push(['triage', 'Check readiness', 'primary']);
+    if (c.status === 'PLANNING' && !plan && c.case_type !== 'ACCESS_REQUEST') buttons.push(['generate', 'Generate AI plan', 'primary']);
+    if (plan?.status === 'DRAFT') { buttons.push(['submit', 'Send to manager for approval', 'primary']); buttons.push(['edit', 'Revise as manager', '']); }
+    if (plan?.status === 'PENDING_APPROVAL' && !plan.parent_plan_id) buttons.push(['edit', 'Revise as manager', '']);
+    if (pending && pending.assigned_to === me.id) { buttons.push(['approve', 'Approve plan', 'good']); buttons.push(['reject', 'Reject', 'danger']); }
+    if (plan?.status === 'APPROVED' && ['APPROVED', 'FAILED'].includes(c.status)) buttons.push([c.status === 'FAILED' ? 'retry' : 'execute', c.status === 'FAILED' ? 'Retry failed actions' : 'Execute approved plan', 'primary']);
+    if (c.status === 'COMPLETED' && state.data.plans.some((p) => p.parent_plan_id) && c.case_type === 'OFFBOARDING') buttons.push(['lesson', 'Turn the correction into a lesson', '']);
 
-function setActiveTab(name) {
-  state.activeTab = name;
-  document.querySelectorAll('.workspace-tab').forEach((button) => button.classList.toggle('active', button.dataset.tab === name));
-  document.querySelectorAll('.workspace-tab-panel').forEach((panel) => panel.classList.toggle('active', panel.id === `tab-${name}`));
-}
+    el.innerHTML = `
+      <div class="card-head"><h2>Next step</h2><span class="spacer"></span>${state.busy ? '<span class="faint">working…</span>' : ''}</div>
+      ${pending ? `<div class="item">Waiting for <b>${esc(pending.assigned_to_name)}</b> to approve r${plan.revision}.</div>` : ''}
+      <div class="btn-row" style="margin-top:10px">${buttons.map(([id, label, tone]) =>
+        `<button class="btn ${tone}" data-act="${id}" ${state.busy ? 'disabled' : ''}>${esc(label)}</button>`).join('') || '<span class="faint">Nothing to do right now.</span>'}</div>
+      ${c.status === 'COMPLETED' ? `<div class="btn-row" style="margin-top:12px">
+        <a class="btn" href="/api/cases/${c.id}/evidence" target="_blank" rel="noopener">ISO 27001 evidence report</a></div>` : ''}`;
+    el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => handle(b.dataset.act)));
+  }
 
-$('refreshButton').addEventListener('click', () => refreshWorkspace());
-$('copyCaseIdButton').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(state.caseId); showToast('Case ID copied.', 'success'); }
-  catch { showToast('Could not access the clipboard.', 'error'); }
-});
-$('generatePlanButton').addEventListener('click', generatePlan);
-$('emptyGeneratePlanButton').addEventListener('click', generatePlan);
-$('submitPlanButton').addEventListener('click', () => openModal('approvalModal'));
-$('executePlanButton').addEventListener('click', () => executePlan(false));
-$('retryPlanButton').addEventListener('click', () => executePlan(true));
-$('approvalForm').addEventListener('submit', submitApproval);
-$('decisionForm').addEventListener('submit', decideApproval);
-$('refreshEvidenceButton').addEventListener('click', async () => { await loadEvidence(); showToast('Policy evidence refreshed.', 'success'); });
-$('refreshAuditButton').addEventListener('click', async () => { await loadAudit(); showToast('Audit data refreshed.', 'success'); });
+  function handle(action) {
+    const c = state.data.case;
+    const plan = latestPlan();
+    const pending = plan?.approvals.find((a) => a.status === 'PENDING');
+    const me = actingAs();
+    const run = {
+      triage: () => act(() => api(`/cases/${c.id}/triage`, { method: 'POST' })),
+      generate: () => act(async () => {
+        toast('The AI is drafting the plan from company policy…');
+        await api(c.case_type === 'OFFBOARDING' ? `/cases/${c.id}/offboarding/plan` : `/cases/${c.id}/plan`, { method: 'POST' });
+      }),
+      submit: () => act(() => api(`/plans/${plan.id}/submit`, { method: 'POST', body: { assigned_to: c.case_facts.manager_id || PEOPLE.nabil.id } })),
+      edit: () => { state.editing = true; renderEditor(); document.getElementById('editor').scrollIntoView({ behavior: 'smooth' }); },
+      approve: () => act(() => api(`/approvals/${pending.id}/decision`, { method: 'POST', body: { decided_by: me.id, decision: 'APPROVED', comment: 'Approved in workspace.' } })),
+      reject: () => {
+        const comment = prompt('Why are you rejecting this plan?');
+        if (comment) act(() => api(`/approvals/${pending.id}/decision`, { method: 'POST', body: { decided_by: me.id, decision: 'REJECTED', comment } }));
+      },
+      execute: () => act(async () => {
+        toast('Executing: n8n runs each approved action, the backend verifies it.');
+        await api(`/plans/${plan.id}/execute`, { method: 'POST' });
+        toast('All actions verified.');
+      }),
+      retry: () => act(() => api(`/plans/${plan.id}/retry`, { method: 'POST' })),
+      lesson: () => act(async () => {
+        await api(`/cases/${c.id}/learning/candidate`, { method: 'POST', body: { assigned_to: PEOPLE.tahmid.id } });
+        toast('Lesson drafted; Tahmid approves it on the Approvals page.');
+      }),
+    };
+    run[action]?.();
+  }
 
-document.querySelectorAll('.workspace-tab').forEach((button) => button.addEventListener('click', () => setActiveTab(button.dataset.tab)));
-document.querySelectorAll('[data-open-tab]').forEach((button) => button.addEventListener('click', () => setActiveTab(button.dataset.openTab)));
-document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', () => closeModal(button.dataset.closeModal)));
-document.querySelectorAll('.modal-backdrop').forEach((modal) => modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(modal.id); }));
-document.querySelectorAll('[data-coming-soon]').forEach((button) => button.addEventListener('click', () => showToast(`${button.dataset.comingSoon} will be built in a later page.`)));
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') document.querySelectorAll('.modal-backdrop:not(.hidden)').forEach((modal) => closeModal(modal.id));
-});
+  // ---------- Timeline ----------
+  async function loadTimeline() {
+    try {
+      const t = await api(`/audit/cases/${caseId}/timeline`);
+      document.getElementById('timeline').innerHTML = t.events.slice(-14).reverse().map((e) => `
+        <div style="display:flex;gap:8px;align-items:baseline">
+          <span class="chip">${esc(e.actor_type)}</span>
+          <div style="flex:1;min-width:0"><div>${esc(human(e.event_type))}</div>
+          <div class="faint">${new Date(e.occurred_at).toLocaleTimeString()}</div></div></div>`).join('') || '<div class="empty">No events yet.</div>';
+    } catch { /* timeline is optional */ }
+  }
 
-loadLocalState();
-refreshWorkspace();
-setInterval(() => refreshWorkspace(true), 45000);
+  function render() { renderHeader(); renderPlan(); renderEditor(); renderActions(); }
+
+  async function load() {
+    state.data = await api(`/cases/${caseId}/plans`);
+    render();
+  }
+
+  document.addEventListener('persona', () => state.data && renderActions());
+  poll(load, 2500);
+  poll(loadTimeline, 5000);
+  setInterval(() => state.data && renderHeader(), 1000);
+})();
