@@ -10,7 +10,8 @@
   const page = LO.shell({ active: 'index.html', title: 'Workforce map', bare: true });
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const STORY = new Set(Object.values(PEOPLE).map((p) => p.id));
-  const SLOTS = 15, SPAN = 150;   // visible fan items and the arc they span, in degrees
+  const SLOTS = 15;
+  const ITEM_MID = 9;   // px from a fan item's top to its dot centre; whole pixels keep text sharp
 
   const SHAPE = {
     person: '<circle cx="7" cy="7" r="4.6" fill="currentColor"/>',
@@ -36,8 +37,8 @@
     <section class="card stage" id="stage">
       <svg class="tree" id="tree">
         <defs>
-          <linearGradient id="dept-grad" x1="0" x2="1"><stop offset="0" stop-color="#7fe0cf" stop-opacity=".15"/><stop offset="1" stop-color="#e6bd6e" stop-opacity=".9"/></linearGradient>
-          <linearGradient id="line-grad" x1="0" x2="1"><stop offset="0" stop-color="#e6bd6e" stop-opacity=".9"/><stop offset=".6" stop-color="#cfe9e4" stop-opacity=".55"/><stop offset="1" stop-color="#cfe9e4" stop-opacity=".25"/></linearGradient>
+          <linearGradient id="dept-grad" x1="0" x2="1"><stop offset="0" stop-color="#c9894a" stop-opacity=".3"/><stop offset="1" stop-color="#eebb70" stop-opacity="1"/></linearGradient>
+          <linearGradient id="line-grad" x1="0" x2="1"><stop offset="0" stop-color="#f3c780" stop-opacity="1"/><stop offset=".55" stop-color="#d69b56" stop-opacity=".8"/><stop offset="1" stop-color="#b9824a" stop-opacity=".6"/></linearGradient>
           <linearGradient id="hot-grad" x1="0" x2="1"><stop offset="0" stop-color="#e6bd6e" stop-opacity=".8"/><stop offset="1" stop-color="#ff6a5a"/></linearGradient>
         </defs>
         <g id="lines"></g>
@@ -94,6 +95,7 @@
   const $ = (id) => document.getElementById(id);
   const stage = $('stage');
   const pct = (v) => (v === null || v === undefined ? null : `${v}%`);
+  const titled = (v) => human(v).replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bIt\b/, 'IT');
 
   // ---------- Model ----------
   function buildModel(graph) {
@@ -140,19 +142,20 @@
 
   // ---------- Geometry ----------
   function geometry() {
-    const W = stage.clientWidth, H = stage.clientHeight;
+    const W = stage.clientWidth;
     const panel = W > 1100 ? 412 : 0;
+    const H = panel ? stage.clientHeight : 620;   // narrow screens: the panel sits below the map
     const right = W - panel;
-    const orb = { x: Math.max(150, Math.min(210, right * 0.16)), y: H / 2 };
+    const orb = { x: Math.round(Math.max(150, Math.min(210, right * 0.16))), y: Math.round(H / 2) };
     const deptX = orb.x + 155;
     const n = state.model.depts.length;
     const spacing = Math.min(62, (H - 70) / Math.max(n, 1));
-    const deptY = (i) => H / 2 + (i - (n - 1) / 2) * spacing;
+    const deptY = (i) => Math.round(H / 2 + (i - (n - 1) / 2) * spacing);
     const origin = { x: deptX + 168, y: deptY(Math.max(0, state.model.depts.findIndex((d) => d.dept === state.dept))) };
     const ax = origin.x + 26;
     const rx = Math.max(90, Math.min(240, right - ax - 250));
-    const step = Math.min(42, (H - 64) / SLOTS);
-    return { W, H, panel, right, orb, deptX, deptY, origin, ax, ay: H / 2, rx, step };
+    const step = Math.round(Math.min(42, (H - 64) / SLOTS));
+    return { W, H, panel, right, orb, deptX, deptY, origin, ax, ay: Math.round(H / 2), rx, step };
   }
   // Equal vertical steps along a bowed arc, so labels never collide.
   function slot(g, k) {
@@ -160,7 +163,7 @@
     const dy = (k - half) * g.step;
     const reach = half * g.step * 1.15;
     const off = Math.abs(k - half);
-    return { x: g.ax + g.rx * Math.sqrt(Math.max(0, 1 - (dy / reach) ** 2)), y: g.ay + dy,
+    return { x: Math.round(g.ax + g.rx * Math.sqrt(Math.max(0, 1 - (dy / reach) ** 2))), y: Math.round(g.ay + dy),
       opacity: k < 0 || k > SLOTS - 1 ? 0 : off > half - 2 ? 0.45 + 0.55 * (half - off) / 2 : 1 };
   }
   const curve = (x1, y1, x2, y2, a = 0.45, b = 0.4) => `M${x1},${y1}C${x1 + (x2 - x1) * a},${y1} ${x2 - (x2 - x1) * b},${y2} ${x2},${y2}`;
@@ -179,7 +182,7 @@
         .attr('cx', (d, i) => Math.cos((i / nodes.length) * Math.PI * 2) * (r + (i % 3) * 3))
         .attr('cy', (d, i) => Math.sin((i / nodes.length) * Math.PI * 2) * (r + (i % 3) * 3))
         .attr('r', (d) => (d.alarm ? 3.4 : 1.6))
-        .attr('fill', (d) => (d.alarm ? '#ff6a5a' : d.kind === 'agent' ? '#b29bff' : d.status === 'DEPARTING' ? '#f2b552' : d.status === 'INACTIVE' ? '#3d4b4c' : '#e9dcbc'))
+        .attr('fill', (d) => (d.alarm ? '#ff6a5a' : d.kind === 'agent' ? '#b29bff' : d.status === 'DEPARTING' ? '#ff9442' : d.status === 'INACTIVE' ? '#3d4b4c' : '#d9a95e'))
         .style('filter', (d) => (d.alarm ? 'drop-shadow(0 0 4px #ff6a5a)' : null));
     };
     ring('ring-people', m.people, 96);
@@ -194,15 +197,15 @@
         .call((s) => s.transition().delay((d, i) => (reduced ? 0 : 200 + i * 60)).duration(0).style('opacity', 1)));
     sel.classed('on', (d) => d.dept === state.dept)
       .style('left', `${g.deptX}px`).style('top', (d, i) => `${g.deptY(i)}px`)
-      .html((d) => `<span class="n">${d.people}</span><span class="meta"><b>${esc(human(d.dept))}</b><span>${d.agents} agent${d.agents === 1 ? '' : 's'}</span></span>${d.alarms ? `<span class="alarm">${d.alarms}</span>` : ''}`);
+      .html((d) => `<span class="n">${d.people}</span><span class="meta"><b>${esc(titled(d.dept))}</b><span>${d.agents} agent${d.agents === 1 ? '' : 's'}</span></span>${d.alarms ? `<span class="alarm">${d.alarms}</span>` : ''}`);
   }
 
   // ---------- Render: fan ----------
   function itemShape(n) {
     if (n.kind === 'agent') return { svg: SHAPE.agent, color: n.alarm ? '#ff6a5a' : '#b29bff' };
-    if (n.status === 'DEPARTING') return { svg: SHAPE.departing, color: '#f2b552' };
+    if (n.status === 'DEPARTING') return { svg: SHAPE.departing, color: '#ff9442' };
     if (n.status === 'INACTIVE') return { svg: SHAPE.inactive, color: '#5c6d6e' };
-    return { svg: SHAPE.person, color: STORY.has(n.id) ? '#f6d898' : '#e9dcbc' };
+    return { svg: SHAPE.person, color: STORY.has(n.id) ? '#f3c780' : '#d8b47e' };
   }
   function itemChips(n) {
     if (n.kind === 'agent') {
@@ -219,15 +222,15 @@
     const pos = new Map(items.map((n, i) => [n.id, slot(g, i - state.offset)]));
     const fresh = (n) => previous && n.alarm && !previous.byId.get(n.id)?.alarm;
 
-    d3.select('#fan').selectAll('div.fan-item').data(items, (d) => d.id)
+    d3.select('#fan').selectAll('div.fan-item:not(.gone)').data(items, (d) => d.id)
       .join(
         (enter) => enter.append('div').attr('class', 'fan-item')
           .style('opacity', 0)
-          .style('transform', (d) => `translate(${g.origin.x}px, ${g.origin.y}px) translateY(-50%)`)
+          .style('transform', () => `translate(${Math.round(g.origin.x)}px, ${Math.round(g.origin.y) - ITEM_MID}px)`)
           .on('mouseenter', (e, d) => hover(d.id)).on('mouseleave', () => hover(null))
           .on('click', (e, d) => focus(d.id)),
         (update) => update,
-        (exit) => exit.transition().duration(reduced ? 0 : 300).style('opacity', 0).remove(),
+        (exit) => fadeOut(exit.style('pointer-events', 'none')),
       )
       .each(function (d, i) {
         const el = this, p = pos.get(d.id), s = itemShape(d);
@@ -235,7 +238,7 @@
         el.innerHTML = `<span class="dot" style="color:${s.color}"><svg viewBox="0 0 14 14">${s.svg}</svg></span>
           <span><span class="label">${esc(d.name)}</span><span class="sub">${itemChips(d)}</span></span>`;
         const apply = () => {
-          el.style.transform = `translate(${p.x}px, ${p.y}px) translateY(-50%)`;
+          el.style.transform = `translate(${p.x}px, ${p.y - ITEM_MID}px)`;
           el.style.opacity = p.opacity;
           el.style.pointerEvents = p.opacity ? 'auto' : 'none';
         };
@@ -245,10 +248,19 @@
       });
 
     const n = items.length;
-    $('fan-hint').textContent = n > SLOTS ? `${state.offset + 1}–${Math.min(n, state.offset + SLOTS)} of ${n} · scroll to turn` : `${n} in ${human(state.dept)}`;
-    $('fan-hint').style.left = `${g.ax + g.rx - 40}px`;
-    $('fan-hint').style.bottom = '14px';
+    $('fan-hint').textContent = n > SLOTS ? `${state.offset + 1}–${Math.min(n, state.offset + SLOTS)} of ${n} · scroll to turn` : `${n} in ${titled(state.dept)}`;
+    $('fan-hint').style.left = `${g.ax + 8}px`;
+    $('fan-hint').style.top = '16px';
     renderLines(g, items, pos);
+  }
+
+  // Leaving elements fade by CSS and are removed by a plain timer, so they
+  // never pile up even when the tab is in the background.
+  function fadeOut(selection) {
+    selection.classed('gone', true).style('opacity', 0);
+    const nodes = selection.nodes();
+    setTimeout(() => nodes.forEach((n) => n.remove()), reduced ? 0 : 450);
+    return selection;
   }
 
   function renderLines(g, items, pos) {
@@ -258,9 +270,9 @@
       const p = pos.get(n.id);
       return { id: `f:${n.id}`, node: n.id, cls: `t-line${n.alarm ? ' hot' : ''}`, d: curve(g.origin.x, g.origin.y, p.x - 8, p.y), opacity: p.opacity };
     });
-    const lines = d3.select('#lines').selectAll('path').data([...deptLines, ...fanLines], (d) => d.id)
+    const lines = d3.select('#lines').selectAll('path:not(.gone)').data([...deptLines, ...fanLines], (d) => d.id)
       .join(
-        (enter) => enter.append('path').attr('d', (d) => d.d).style('opacity', 0)
+        (enter) => enter.append('path').attr('d', (d) => d.d).style('opacity', (d) => d.opacity)
           .each(function (d) {
             if (reduced) return;
             const len = this.getTotalLength();
@@ -269,7 +281,7 @@
               .attr('stroke-dashoffset', 0).on('end', function () { d3.select(this).attr('stroke-dasharray', null).attr('stroke-dashoffset', null).attr('d', (x) => x.d); });
           }),
         (update) => update,
-        (exit) => exit.transition().duration(reduced ? 0 : 300).style('opacity', 0).remove(),
+        (exit) => fadeOut(exit.interrupt()),
       );
     lines.attr('class', (d) => d.cls);
     lines.filter(function () { return !this.__transition; }).transition().duration(reduced ? 0 : 650).ease(d3.easeCubicOut)
@@ -315,8 +327,8 @@
       if (n.kind === 'agent') related.add(n.sponsor);
       else n.agentIds.forEach((a) => related.add(a));
     }
-    d3.selectAll('#fan .fan-item').classed('dimmed', (d) => Boolean(n) && !related.has(d.id));
-    d3.selectAll('#lines path').classed('lit', (d) => Boolean(n) && related.has(d.node)).classed('dim', (d) => Boolean(n) && d.node && !related.has(d.node));
+    d3.selectAll('#fan .fan-item:not(.gone)').classed('dimmed', (d) => Boolean(n) && !related.has(d.id));
+    d3.selectAll('#lines path:not(.gone)').classed('lit', (d) => Boolean(n) && related.has(d.node)).classed('dim', (d) => Boolean(n) && d.node && !related.has(d.node));
   }
   $('fan').addEventListener('wheel', (e) => {
     if (!state.items || state.items.length <= SLOTS) return;
@@ -394,7 +406,7 @@
     if (!d) return companyPanel();
     return `${close}
       <div class="eyebrow">${ico('team')}Department</div>
-      <h2>${esc(human(dept))}<small>${d.people} people · ${d.agents} agents</small></h2>
+      <h2>${esc(titled(dept))}<small>${d.people} people · ${d.agents} agents</small></h2>
       <div class="hero-metric ${d.coverage < 100 ? 'hot' : ''}"><div class="faint" style="color:var(--text-2)">Agents with an active sponsor</div>
         <div class="row"><div class="big" data-count="${d.coverage}%">${d.coverage}%</div></div></div>
       <div class="tiles">
@@ -416,14 +428,14 @@
           <div style="margin-top:6px;font-size:14px">${n.violation ? 'It breaks the current access policy.' : ''} ${n.reasons.map((r) => esc(human(r))).join('; ')}</div></div>` : ''}
         <div class="tiles">
           ${tile('person', sponsor ? sponsor.name : 'none', `Sponsor${sponsor ? ` · ${esc(human(sponsor.status))}` : ''}`, sponsor && sponsor.status !== 'ACTIVE' ? 'bad' : '')}
-          ${tile('team', human(n.dept), 'Department')}
+          ${tile('team', titled(n.dept), 'Department')}
         </div>
         <div class="btn-row">${sponsor ? `<a class="btn" href="#" data-focus="${sponsor.id}">Show sponsor</a>` : ''}${n.violation ? '<a class="btn" href="guardian.html">Open Policy Guardian</a>' : ''}</div>`;
     }
     const agents = n.agentIds.map((id) => state.model.byId.get(id)).filter(Boolean);
     return `${close}
       <div class="eyebrow">${ico('person')}Person</div>
-      <h2>${esc(n.name)}<small>${esc(n.title || '—')} · ${esc(human(n.dept))}</small></h2>
+      <h2>${esc(n.name)}<small>${esc(n.title || '—')} · ${esc(titled(n.dept))}</small></h2>
       <div class="chips">${badge(n.status)}${n.role ? `<span class="badge idle">${esc(human(n.role))}</span>` : ''}</div>
       <div class="tiles">
         ${tile('key', String(n.access), 'Live access<br>email, GitHub, laptop, training')}
