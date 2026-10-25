@@ -181,3 +181,20 @@ def test_offline_executor_errors_become_dispatch_errors(monkeypatch):
     monkeypatch.setattr(offline_executor, "dispatch_offline", broken)
     with pytest.raises(n8n_client.N8NDispatchError, match="Offline executor failed"):
         n8n_client.dispatch_to_n8n({"action_id": "x"})
+
+
+def test_structured_output_survives_the_cache(tmp_path):
+    from langchain_core.messages import AIMessage
+    from langchain_core.outputs import ChatGeneration
+    from pydantic import BaseModel
+
+    from app.demo.ai_cache import DemoLLMCache
+
+    class Summary(BaseModel):
+        rationale: str
+
+    generation = ChatGeneration(message=AIMessage(content="{}", additional_kwargs={"parsed": Summary(rationale="ok")}))
+    cache = DemoLLMCache(tmp_path, mode=lambda: "CACHED_AI")
+    cache.update("prompt", "llm", [generation])
+    restored = cache.lookup("prompt", "llm")
+    assert restored[0].message.additional_kwargs["parsed"] == {"rationale": "ok"}

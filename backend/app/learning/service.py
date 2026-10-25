@@ -401,6 +401,9 @@ def _policy_evidence_for_plan(
             )
         policies.append(policy)
         evidence_ids.extend(str(item) for item in (link.evidence_ids or []))
+    # Links come back in no fixed order; a stable order keeps the lesson
+    # prompt identical between runs, so the demo cache can answer it.
+    policies.sort(key=lambda policy: (policy.policy_code, policy.version_number))
     return policies, sorted(set(evidence_ids))
 
 

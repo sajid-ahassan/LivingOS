@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-10-25T11:27:57.841825+00:00",
+  "demo_mode": "OFFLINE",
+  "company": "Nexora Labs (fictional demo company)",
+  "note": "Measured on the demo company; numbers are reported as found.",
+  "plan_generation": {
+    "n": 1,
+    "first_pass_valid_pct": 100.0,
+    "valid_after_repair_pct": 100.0,
+    "sent_to_human_review": 0
+  },
+  "evidence": {
+    "n": 18,
+    "steps_with_policy_evidence_pct": 100.0
+  },
+  "retrieval": {
+    "n": 8,
+    "recall_at_1_pct": 100.0,
+    "recall_at_3_pct": 100.0,
+    "top1_misses": []
+  },
+  "guardian": {
+    "n_scenarios": 6,
+    "expected_impacts": 2,
+    "recall_pct": 100.0,
+    "false_impacts": 0
+  },
+  "execution": {
+    "n": 9,
+    "verified_completion_pct": 100.0,
+    "retries_recovered": 0,
+    "replays_absorbed": 0
+  }
+}

@@ -105,6 +105,19 @@ class _Store:
         return sum(1 for _ in self.directory.glob("*/*.json"))
 
 
+def _serializable(generation: Any) -> Any:
+    """Structured output leaves a Pydantic object in additional_kwargs["parsed"],
+    which LangChain cannot serialize. The OpenAI parser also accepts a plain
+    dict there, so store the dict."""
+    message = getattr(generation, "message", None)
+    parsed = (getattr(message, "additional_kwargs", None) or {}).get("parsed")
+    if parsed is None or not hasattr(parsed, "model_dump"):
+        return generation
+    copy = generation.model_copy(deep=True)
+    copy.message.additional_kwargs["parsed"] = parsed.model_dump(mode="json")
+    return copy
+
+
 class DemoLLMCache(BaseCache):
     """LangChain global LLM cache that follows DEMO_MODE."""
 
@@ -148,7 +161,7 @@ class DemoLLMCache(BaseCache):
             self._key(prompt, llm_string),
             {
                 "prompt": self.prompt_preview(prompt),
-                "generations": dumps(list(return_val)),
+                "generations": dumps([_serializable(g) for g in return_val]),
             },
         )
 
