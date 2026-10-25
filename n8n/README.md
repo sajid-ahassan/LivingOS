@@ -9,6 +9,7 @@ backend verifies GitHub results itself with its own read-only token.
 | `livingops-executor.json` | Webhook `POST /webhook/livingops-executor` | Checks the shared header token. `target = github`: lists deploy keys, plans the calls (idempotent), calls the GitHub REST API. `target = mock`: calls the backend `/mock/resources/apply`. Answers `{status: "SUCCEEDED", execution_id, external_ref, details}`. Any failed node makes n8n answer non-2xx, which the backend treats as a failure. |
 | `livingops-notifier.json` | Webhook `POST /webhook/livingops-notifier` | Formats an approval / Guardian message and posts it to a Slack channel (incoming webhook). |
 | `livingops-expiry-sweeper.json` | Every 5 minutes | Calls the backend `POST /access-grants/expire-due` (added in W5); the backend finds expired grants and revokes them through the executor. |
+| `livingops-keepalive.json` | Every 2 days at 09:00 | Calls the backend `GET /health`, which wakes the Render service and touches Supabase and Qdrant, so the free tiers do not pause between now and the final. Publish it and leave it on; it costs about 4 Render hours a month. |
 
 Written for n8n 1.x node versions; adjust after import if your instance
 reports a different version.
