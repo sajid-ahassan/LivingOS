@@ -48,14 +48,18 @@ def _result(call_result: Any) -> Any:
     )
     if structured is not None:
         return structured.get("result", structured) if isinstance(structured, dict) else structured
+    # A list comes back as one text block per item.
+    values = []
     for block in getattr(call_result, "content", []) or []:
         text = getattr(block, "text", None)
         if text:
             try:
-                return json.loads(text)
+                values.append(json.loads(text))
             except ValueError:
-                return text
-    return None
+                values.append(text)
+    if not values:
+        return None
+    return values[0] if len(values) == 1 else values
 
 
 def _say(title: str, data: Any) -> None:

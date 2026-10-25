@@ -460,10 +460,12 @@ def verify_action_resource(
         action.resource_type,
     )
 
+    # n8n changed the row from another connection; sessions keep objects
+    # after commit (expire_on_commit=False), so read it fresh.
     resource = db.scalar(
-        select(CompanyResource).where(
-            CompanyResource.resource_key == expected_key
-        )
+        select(CompanyResource)
+        .where(CompanyResource.resource_key == expected_key)
+        .execution_options(populate_existing=True)
     )
 
     problems: list[str] = []
@@ -681,7 +683,7 @@ def reconcile_applied_action(
                 == action.idempotency_key,
                 CompanyResource.source_action_id == action.id,
             )
-        )
+        ).execution_options(populate_existing=True)
     )
 
     if resource is None:
