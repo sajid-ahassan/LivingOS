@@ -144,7 +144,7 @@
   function geometry() {
     const W = stage.clientWidth;
     const panel = W > 1100 ? 412 : 0;
-    const H = panel ? stage.clientHeight : 620;   // narrow screens: the panel sits below the map
+    const H = panel && stage.clientHeight > 400 ? stage.clientHeight : 620;   // narrow screens: the panel sits below the map
     const right = W - panel;
     const orb = { x: Math.round(Math.max(150, Math.min(210, right * 0.16))), y: Math.round(H / 2) };
     const deptX = orb.x + 155;
@@ -476,8 +476,10 @@
     $('kpi-note').textContent = state.kpis.label;
     renderPanel();
   }
+  // Redraw whenever the stage changes size, including its first real layout,
+  // so lines are never left on a geometry measured too early.
   let resizeTimer;
-  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => render(), 150); });
+  new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => render(), 120); }).observe(stage);
 
   // ---------- Table ----------
   function renderRows() {
