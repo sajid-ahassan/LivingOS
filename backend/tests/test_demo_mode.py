@@ -198,3 +198,10 @@ def test_structured_output_survives_the_cache(tmp_path):
     cache.update("prompt", "llm", [generation])
     restored = cache.lookup("prompt", "llm")
     assert restored[0].message.additional_kwargs["parsed"] == {"rationale": "ok"}
+
+
+def test_settings_strip_pasted_newlines(monkeypatch):
+    from app.config import Settings
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test\n")
+    assert Settings().openai_api_key == "sk-test"

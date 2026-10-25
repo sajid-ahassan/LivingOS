@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     def github_enabled(self) -> bool:
         return bool(self.github_org and self.github_read_token)
 
+    @field_validator("*", mode="before")
+    @classmethod
+    def strip_whitespace(cls, value: object) -> object:
+        # A value pasted into a hosting dashboard can carry a trailing
+        # newline, which makes HTTP headers (API keys, tokens) illegal.
+        return value.strip() if isinstance(value, str) else value
+
     @field_validator("database_url", mode="before")
     @classmethod
     def use_psycopg3_driver(cls, value: object) -> object:
