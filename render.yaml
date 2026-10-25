@@ -52,6 +52,25 @@ services:
       - key: APP_BASE_URL
         sync: false
 
+  # Zero-build frontend as a free static site (never sleeps). Render itself
+  # forwards /api/* to the backend, so the pages keep calling /api as they do
+  # behind serve_frontend.py locally.
+  - type: web
+    name: livingops-frontend
+    runtime: static
+    branch: final-build
+    buildCommand: echo "static frontend, no build"
+    staticPublishPath: ./frontend
+    autoDeploy: false
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://livingops-backend.onrender.com/*
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+
   - type: web
     name: livingops-mcp
     runtime: docker
