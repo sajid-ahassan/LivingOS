@@ -111,34 +111,36 @@
     return () => clearInterval(timer);
   }
 
-  function shell({ active, title, subtitle }) {
+  function shell({ active, title, subtitle, bare }) {
     const nav = NAV.map((n) => `
       <a href="${n.href}" class="${n.href === active ? 'active' : ''}">
-        ${icon(n.icon)}${n.label}
+        ${icon(n.icon)}<span class="lbl">${n.label}</span>
         ${n.count ? `<span class="count hidden" id="nav-count-${n.count}"></span>` : ''}
       </a>`).join('');
     const options = Object.entries(PEOPLE).filter(([k]) => k !== 'arif')
       .map(([key, p]) => `<option value="${key}">${esc(p.name)} · ${esc(p.role)}</option>`).join('');
+    document.title = `${title} · LivingOps`;
     document.body.insertAdjacentHTML('afterbegin', `
       <div class="shell">
-        <aside class="sidebar">
-          <div class="brand"><div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.3 7.2l7.4 3.6M8.3 16.8l7.4-3.6"/></svg></div><div><b>LivingOps</b><span>Every access has an owner</span></div></div>
-          <div class="nav-label">Workspace</div>
-          <nav class="nav">${nav}</nav>
-          <div class="sidebar-foot"><div class="live"><i></i>Nexora Labs</div>A fictional demo company.</div>
-        </aside>
-        <div class="main">
-          <header class="topbar">
-            <div class="title"><h1>${esc(title)}</h1><span class="faint">${esc(subtitle || '')}</span></div>
+        <header class="topnav">
+          <a class="brand" href="index.html"><div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8.5" stroke-dasharray="2 3"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></div>
+            <div><b>LivingOps</b><span>Every access has an owner</span></div></a>
+          <nav class="nav pill">${nav}</nav>
+          <div class="right">
             <span id="mode-badge" class="badge idle">connecting</span>
-            <label class="persona">Acting as <select id="persona-select">${options}</select></label>
-          </header>
+            <label class="persona" title="Acting as"><span class="avatar" id="persona-initials"></span><select id="persona-select">${options}</select></label>
+          </div>
+        </header>
+        <div class="main">
+          ${bare ? '' : `<div class="content" style="padding-bottom:0;animation:none"><div class="page-head"><div class="title"><h1>${esc(title)}</h1><span class="faint">${esc(subtitle || '')}</span></div></div></div>`}
           <main class="content" id="page"></main>
         </div>
       </div>`);
     const select = document.getElementById('persona-select');
     select.value = persona();
-    select.addEventListener('change', () => setPersona(select.value));
+    const initials = () => { document.getElementById('persona-initials').textContent = actingAs().name.split(' ').map((p) => p[0]).join(''); };
+    initials();
+    select.addEventListener('change', () => { setPersona(select.value); initials(); });
     refreshChrome();
     setInterval(refreshChrome, 10000);
     return document.getElementById('page');
