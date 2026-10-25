@@ -12,12 +12,22 @@
     arif: { id: '66666666-6666-4666-8666-666666666666', name: 'Arif Hossain', role: 'Senior Software Engineer' },
   };
 
+  // Inline stroke icons (no icon font, so they work OFFLINE).
+  const ICON = {
+    dashboard: '<path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/>',
+    cases: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    approvals: '<path d="M9 12l2 2 4-4"/><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/>',
+    guardian: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h4"/>',
+    security: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  };
+  const icon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
+
   const NAV = [
-    { href: 'index.html', label: 'Dashboard', icon: '◎' },
-    { href: 'cases.html', label: 'Cases', icon: '▤' },
-    { href: 'approvals.html', label: 'Approvals', icon: '◇', count: 'approvals' },
-    { href: 'guardian.html', label: 'Policy Guardian', icon: '⛨' },
-    { href: 'security.html', label: 'Security', icon: '◬' },
+    { href: 'index.html', label: 'Dashboard', icon: 'dashboard' },
+    { href: 'cases.html', label: 'Cases', icon: 'cases' },
+    { href: 'approvals.html', label: 'Approvals', icon: 'approvals', count: 'approvals' },
+    { href: 'guardian.html', label: 'Policy Guardian', icon: 'guardian' },
+    { href: 'security.html', label: 'Security', icon: 'security' },
   ];
 
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => (
@@ -104,7 +114,7 @@
   function shell({ active, title, subtitle }) {
     const nav = NAV.map((n) => `
       <a href="${n.href}" class="${n.href === active ? 'active' : ''}">
-        <span aria-hidden="true">${n.icon}</span>${n.label}
+        ${icon(n.icon)}${n.label}
         ${n.count ? `<span class="count hidden" id="nav-count-${n.count}"></span>` : ''}
       </a>`).join('');
     const options = Object.entries(PEOPLE).filter(([k]) => k !== 'arif')
@@ -112,14 +122,15 @@
     document.body.insertAdjacentHTML('afterbegin', `
       <div class="shell">
         <aside class="sidebar">
-          <div class="brand"><div class="brand-mark">L</div><div><b>LivingOps AI</b><span>Every access has an owner</span></div></div>
+          <div class="brand"><div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.3 7.2l7.4 3.6M8.3 16.8l7.4-3.6"/></svg></div><div><b>LivingOps</b><span>Every access has an owner</span></div></div>
+          <div class="nav-label">Workspace</div>
           <nav class="nav">${nav}</nav>
-          <div class="sidebar-foot">Nexora Labs is a fictional demo company.</div>
+          <div class="sidebar-foot"><div class="live"><i></i>Nexora Labs</div>A fictional demo company.</div>
         </aside>
         <div class="main">
           <header class="topbar">
             <div class="title"><h1>${esc(title)}</h1><span class="faint">${esc(subtitle || '')}</span></div>
-            <span id="mode-badge" class="badge idle">mode…</span>
+            <span id="mode-badge" class="badge idle">connecting</span>
             <label class="persona">Acting as <select id="persona-select">${options}</select></label>
           </header>
           <main class="content" id="page"></main>
@@ -138,7 +149,7 @@
       const mode = await api('/demo/mode');
       const el = document.getElementById('mode-badge');
       const tone = mode.mode === 'LIVE' ? 'ok' : mode.mode === 'CACHED_AI' ? 'pending' : 'warn';
-      el.className = `badge ${tone}`;
+      el.className = `badge ${tone} live`;
       el.textContent = `${mode.mode.replace('_', ' ')}${mode.github_enabled ? ' · GitHub' : ''}`;
       el.title = `${mode.cached_llm_answers} cached AI answers, ${mode.cached_embeddings} cached embeddings`;
     } catch { /* backend offline: leave the badge as is */ }
@@ -149,5 +160,22 @@
     } catch { /* ignore */ }
   }
 
-  window.LO = { api, toast, esc, badge, timeAgo, clock, human, poll, shell, actingAs, persona, PEOPLE };
+  // Animate a number into an element: "79.2%", "11 / 24" or "5".
+  function countUp(el, text) {
+    const match = /^(\d+(?:\.\d+)?)(.*)$/.exec(String(text));
+    if (!match || el.dataset.shown === String(text) || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = text; el.dataset.shown = text; return;
+    }
+    const target = parseFloat(match[1]), decimals = (match[1].split('.')[1] || '').length;
+    const start = performance.now(), duration = 900;
+    el.dataset.shown = text;
+    const frame = (now) => {
+      const t = Math.min(1, (now - start) / duration), eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = (target * eased).toFixed(decimals) + match[2];
+      if (t < 1 && el.dataset.shown === String(text)) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+
+  window.LO = { countUp, icon, api, toast, esc, badge, timeAgo, clock, human, poll, shell, actingAs, persona, PEOPLE };
 })();

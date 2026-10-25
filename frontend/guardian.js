@@ -62,12 +62,12 @@
         <div class="card-head" style="margin:0"><b>${esc(c.policy_code)} V${c.old_version} → V${c.new_version}</b>
           <span class="spacer"></span>${badge(c.overall_risk, `${c.overall_risk} risk`)}</div>
         <div class="faint">${c.open_impacts} open impact(s) · ${timeAgo(c.created_at)}</div></a>`).join('')
-      : '<div class="empty">No policy has changed yet.</div>';
+      : '<div class="empty"><b>No policy changes yet</b>Activate a new version to see what it affects.</div>';
     document.querySelectorAll('[data-change]').forEach((a) => a.addEventListener('click', (e) => {
       e.preventDefault(); state.selected = a.dataset.change; history.replaceState(null, '', `?change=${state.selected}`); loadView();
     }));
     if (state.selected) await loadView();
-    else document.getElementById('change').innerHTML = '<div class="card empty">Activate a new policy version to see what it affects.</div>';
+    else document.getElementById('change').innerHTML = '<div class="card"><div class="empty" style="padding:48px 18px"><b>Policies are stable</b>When a new version is activated, the Guardian compares the rules and re-checks every plan, lesson and live agent access that depended on the old one.</div></div>';
   }
 
   // ---------- One change ----------
@@ -84,16 +84,16 @@
       <div class="card">
         <div class="card-head"><h2>${esc(v.policy_code)} V${v.old_version} → V${v.new_version}</h2>${badge(v.overall_risk, `${v.overall_risk} risk`)}
           <span class="spacer"></span><span class="faint">${timeAgo(v.created_at)}</span></div>
-        ${s.rationale ? `<div class="ai-note"><b>AI summary of the change</b><br>${esc(s.rationale)}</div>` : ''}
+        ${s.rationale ? `<div class="ai-note"><b>AI summary of the change</b>${esc(s.rationale)}</div>` : ''}
         <p class="faint">Which items are affected is decided by policy links and rules, not by the AI.</p>
-        <div class="grid-2" style="margin-top:10px">
-          <div><h3>V${v.old_version} (before)</h3>${clauses(v.old_clauses)}</div>
-          <div><h3>V${v.new_version} (now)</h3>${clauses(v.new_clauses)}</div>
+        <div class="grid-2" style="margin-top:14px">
+          <div class="stack" style="gap:6px"><h3>V${v.old_version} · before</h3>${clauses(v.old_clauses)}</div>
+          <div class="stack" style="gap:6px"><h3 style="color:var(--ok)">V${v.new_version} · now</h3>${clauses(v.new_clauses)}</div>
         </div>
       </div>
       <div class="card">
         <div class="card-head"><h2>What this change affects</h2><span class="spacer"></span><span class="faint">${v.impacts.length} impact(s)</span></div>
-        <div class="stack">${v.impacts.map(impactCard).join('') || '<div class="empty">Nothing depended on the old version.</div>'}</div>
+        <div class="stack">${v.impacts.map(impactCard).join('') || '<div class="empty"><b>No impacts</b>Nothing depended on the old version.</div>'}</div>
       </div>`;
     document.querySelectorAll('[data-fix]').forEach((b) => b.addEventListener('click', () => fix(b.dataset.fix, b.dataset.kind)));
   }

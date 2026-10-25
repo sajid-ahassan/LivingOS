@@ -4,7 +4,7 @@
   const { api, esc, badge, toast, timeAgo, human, poll, clock, actingAs, PEOPLE } = LO;
   const caseId = new URLSearchParams(location.search).get('case');
   const page = LO.shell({ active: 'cases.html', title: 'Case workspace', subtitle: caseId ? `Case ${caseId}` : 'No case selected' });
-  if (!caseId) { page.innerHTML = '<div class="empty">Open a case from the Dashboard.</div>'; return; }
+  if (!caseId) { page.innerHTML = '<div class="empty"><b>No case selected</b>Open one from <a href="cases.html">Cases</a> or the dashboard.</div>'; return; }
 
   page.innerHTML = `
     <section class="card" id="header"></section>
@@ -15,11 +15,11 @@
       </div>
       <div class="stack">
         <div class="card" id="actions"></div>
-        <div class="card"><div class="card-head"><h2>Timeline</h2></div><div id="timeline" class="stack"></div></div>
+        <div class="card"><div class="card-head"><h2>Audit timeline</h2></div><div id="timeline" class="timeline"></div></div>
       </div>
     </section>`;
 
-  const state = { data: null, explanations: {}, open: new Set(), busy: false, editing: false };
+  const state = { data: null, explanations: {}, open: new Set(), busy: false, editing: false, seen: {} };
   const AGENT_OPTIONS = {
     AI_AGENT: ['REASSIGN', 'REVOKE'],
     AGENT_CREDENTIAL: ['REASSIGN', 'DOWNSCOPE', 'REVOKE'],
@@ -37,10 +37,16 @@
     const done = c.status === 'COMPLETED' && verified.length;
     const end = done ? Math.max(...verified) : Date.now();
     const elapsed = end - new Date(c.created_at).getTime();
+    const actions = (plan?.actions || []).filter((a) => a.status !== 'SKIPPED');
+    const verifiedCount = actions.filter((a) => a.status === 'VERIFIED').length;
+    const stage = c.status === 'COMPLETED' ? 4 : ['EXECUTING', 'RETRYING', 'FAILED'].includes(c.status) ? 3
+      : plan?.status === 'APPROVED' ? 2 : plan ? 1 : 0;
+    const stages = ['Readiness', 'AI plan', 'Approved', 'Executing', 'Verified'];
     document.getElementById('header').innerHTML = `
-      <div class="card-head">
+      <div class="card-head" style="margin-bottom:18px">
         <div style="flex:1;min-width:0">
-          <h1>${esc(c.subject_name)} · ${esc(human(c.case_type))}</h1>
+          <h3 style="margin-bottom:6px">${esc(human(c.case_type))}${c.case_type === 'ACCESS_REQUEST' && c.case_facts.tier ? ' · tier ' + esc(c.case_facts.tier) : ''}</h3>
+          <h1 style="font-size:24px">${esc(c.subject_name)}</h1>
           <div class="faint">opened by ${esc(c.created_by_name || '—')} ${timeAgo(c.created_at)}
             ${c.case_facts.last_working_day ? ` · last working day ${esc(c.case_facts.last_working_day)}` : ''}
             ${c.origin ? ` · ${esc(human(c.origin))}` : ''}</div>
@@ -49,9 +55,12 @@
           <div class="faint">${done ? 'All access closed in' : 'Since case opened'}</div>
           <div class="stopwatch ${done ? 'done' : 'running'}">${clock(elapsed)}</div>
         </div>
-        ${badge(c.status)}
       </div>
-      ${c.failure_reason ? `<div class="item highlight">${esc(c.failure_reason)}</div>` : ''}`;
+      <div class="stepper">${stages.map((label, i) => `<div class="${i < stage ? 'done' : i === stage ? 'now' : ''}"><i></i><span>${label}</span></div>`).join('')}</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:14px">${badge(c.status)}
+        ${actions.length ? `<div class="bar" style="flex:1"><i style="width:${(verifiedCount / actions.length) * 100}%;background:var(--ok);transition:width .6s var(--ease)"></i></div>
+        <span class="faint num">${verifiedCount}/${actions.length} verified</span>` : '<span class="spacer"></span>'}</div>
+      ${c.failure_reason ? `<div class="item highlight" style="margin-top:12px">${esc(c.failure_reason)}</div>` : ''}`;
   }
 
   // ---------- Plan and why panel ----------
@@ -79,14 +88,19 @@
     const key = `${plan.id}:${a.sequence}`;
     const open = state.open.has(key);
     const why = open ? whyHtml(plan.id, a.sequence) : '';
-    return `<div class="item">
-      <div class="step">
+    const tone = a.status === 'VERIFIED' ? 'done' : ['DISPATCHED', 'EXECUTING', 'SUCCEEDED', 'RETRYING'].includes(a.status) ? 'running' : '';
+    const fresh = a.status === 'VERIFIED' && state.seen[a.id] && state.seen[a.id] !== 'VERIFIED';
+    state.seen[a.id] = a.status;
+    return `<div class="item ${fresh ? 'flash' : ''}">
+      <div class="step ${tone}">
         <div class="num">${a.sequence}</div>
         <div><div class="what">${esc(human(a.action_type))} · ${esc(human(a.resource_type))}</div>
           <div class="key">${esc(a.resource_key)}</div>
           <div class="faint">${esc(a.reason || '')}</div>
-          ${a.verified_by ? `<div class="faint">verified by ${esc(a.verified_by === 'github' ? 'GitHub API (backend read-only token)' : 'company records')}
-            ${a.n8n_execution_id ? ` · n8n run ${esc(a.n8n_execution_id)}` : ''}${a.verified_at ? ` · ${new Date(a.verified_at).toLocaleTimeString()}` : ''}</div>` : ''}
+          ${a.verified_by ? `<div class="chips" style="margin-top:8px">
+            ${a.verified_by === 'github' ? '<span class="badge ok">verified by GitHub API</span>' : '<span class="badge ok">verified in company records</span>'}
+            ${a.n8n_execution_id ? `<span class="chip">n8n run ${esc(a.n8n_execution_id)}</span>` : ''}
+            ${a.verified_at ? `<span class="chip">${new Date(a.verified_at).toLocaleTimeString()}</span>` : ''}</div>` : ''}
           ${a.error ? `<div class="faint" style="color:var(--bad)">${esc(a.error)}</div>` : ''}
         </div>
         <div class="btn-row">${badge(a.status)}<button class="btn small" data-why="${a.sequence}">${open ? 'Hide why' : 'Why?'}</button></div>
@@ -249,10 +263,9 @@
     try {
       const t = await api(`/audit/cases/${caseId}/timeline`);
       document.getElementById('timeline').innerHTML = t.events.slice(-14).reverse().map((e) => `
-        <div style="display:flex;gap:8px;align-items:baseline">
-          <span class="chip">${esc(e.actor_type)}</span>
-          <div style="flex:1;min-width:0"><div>${esc(human(e.event_type))}</div>
-          <div class="faint">${new Date(e.occurred_at).toLocaleTimeString()}</div></div></div>`).join('') || '<div class="empty">No events yet.</div>';
+        <div class="tl ${e.actor_type === 'AGENT' || e.actor_type === 'AI' ? 'ai' : e.actor_type === 'HUMAN' || e.actor_type === 'USER' ? 'human' : ''}">
+          <div class="tl-what">${esc(human(e.event_type))}</div>
+          <div class="faint"><span class="mono">${esc(e.actor_type)}</span> · ${new Date(e.occurred_at).toLocaleTimeString()}</div></div>`).join('') || '<div class="empty"><b>No events yet</b>Every step lands here as it happens.</div>';
     } catch { /* timeline is optional */ }
   }
 

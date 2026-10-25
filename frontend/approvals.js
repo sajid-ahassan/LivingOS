@@ -30,21 +30,21 @@
     const lesson = a.lesson || {};
     const decided = a.status !== 'PENDING';
     const mine = a.assigned_to === actingAs().id;
-    return `<div class="item ${a.tier === 'HIGH' || a.origin === 'POLICY_GUARDIAN_REMEDIATION' ? 'highlight' : ''}">
+    return `<div class="item ${a.tier === 'HIGH' || a.origin === 'POLICY_GUARDIAN_REMEDIATION' ? 'highlight' : ''}" data-card="${a.id}" style="padding:18px">
       <div class="card-head" style="margin-bottom:8px">
         <span class="badge ${tone}">${esc(kind)}</span>
         ${a.tier ? badge(a.tier, `${a.tier} risk`) : ''}
-        <b>${esc(a.subject_name || '')}</b>
+        <b style="font-weight:600">${esc(a.subject_name || '')}</b>
         <span class="spacer"></span><span class="faint">for ${esc(a.assigned_to_name || '—')} · ${timeAgo(a.requested_at)}</span>
       </div>
       ${a.origin === 'MCP_ACCESS_REQUEST' ? `
         <dl class="kv">
           <dt>Agent</dt><dd class="mono">${esc(a.agent_key || '')}</dd>
-          <dt>Asks for</dt><dd><b>${esc(r.permission)}</b> on <b>${esc(r.resource)}</b> for ${esc(r.duration_minutes)} min</dd>
+          <dt>Asks for</dt><dd><span class="chip" style="color:var(--text)">${esc(r.permission)}</span> on <span class="chip" style="color:var(--text)">${esc(r.resource)}</span> for <span class="num">${esc(r.duration_minutes)} min</span>, then it expires</dd>
           <dt>Why</dt><dd>${esc(r.reason || '')}</dd>
           <dt>Rules</dt><dd>${(a.tier_reasons || []).map((t) => `<span class="chip">${esc(t)}</span>`).join(' ')}</dd>
         </dl>
-        ${a.approver_note ? `<div class="ai-note" style="margin-top:8px"><b>AI summary for the approver</b><br>${esc(a.approver_note)}</div>` : ''}` : ''}
+        ${a.approver_note ? `<div class="ai-note" style="margin-top:12px"><b>AI summary for the approver</b>${esc(a.approver_note)}</div>` : ''}` : ''}
       ${a.target_type === 'LEARNING' ? `
         <dl class="kv">
           <dt>Situation</dt><dd>${esc(lesson.situation || '')}</dd>
@@ -52,7 +52,7 @@
           <dt>Rationale</dt><dd>${esc(lesson.rationale || '')}</dd>
         </dl>` : ''}
       ${a.plan_summary && a.origin !== 'MCP_ACCESS_REQUEST' ? `<p style="margin:6px 0">${esc(a.plan_summary)}</p>` : ''}
-      ${a.correction_summary ? `<div class="item"><b>Correction:</b> ${esc(a.correction_summary)}</div>` : ''}
+      ${a.correction_summary ? `<div class="ai-note" style="border-color:rgba(106,168,255,.3);background:var(--accent-soft)"><b style="color:var(--accent)">Manager correction</b>${esc(a.correction_summary)}</div>` : ''}
       <div class="btn-row" style="margin-top:10px">
         ${a.case_id ? `<a class="btn small" href="workspace.html?case=${a.case_id}">Open case</a>` : ''}
         ${a.lesson_case_id ? `<a class="btn small" href="workspace.html?case=${a.lesson_case_id}">Source case</a>` : ''}
@@ -67,14 +67,23 @@
   async function decide(id, decision, comment) {
     const a = state.rows.find((row) => row.id === id);
     state.busy.add(id); render();
+    const leave = () => new Promise((resolve) => {
+      const el = document.querySelector(`[data-card="${id}"]`);
+      if (!el) { resolve(); return; }
+      el.style.maxHeight = `${el.offsetHeight}px`;
+      el.classList.add('leaving');
+      setTimeout(resolve, 320);
+    });
     try {
       const me = actingAs().id;
       if (a.target_type === 'LEARNING') {
         await api(`/learning-approvals/${id}/decision`, { method: 'POST', body: { decided_by: me, decision, comment } });
         if (decision === 'APPROVED') await api(`/learning/${a.target_id}/index`, { method: 'POST' });
+        await leave();
         toast(decision === 'APPROVED' ? 'Lesson approved and added to memory.' : 'Lesson rejected.');
       } else {
         await api(`/approvals/${id}/decision`, { method: 'POST', body: { decided_by: me, decision, comment } });
+        await leave();
         toast(decision === 'APPROVED'
           ? (a.case_type === 'ACCESS_REQUEST' ? 'Approved: executing and verifying now.' : 'Approved.')
           : 'Rejected.');
@@ -85,7 +94,7 @@
 
   function render() {
     const rows = state.rows || [];
-    document.getElementById('queue').innerHTML = rows.length ? rows.map(card).join('') : '<div class="empty">Nothing is waiting here.</div>';
+    document.getElementById('queue').innerHTML = rows.length ? rows.map(card).join('') : `<div class="empty"><b>${document.getElementById('scope').value === 'decided' ? 'Nothing decided yet' : 'No approvals waiting'}</b>Plans, high-risk agent requests, remediations and lessons appear here when they need an owner.</div>`;
     document.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', () => decide(b.dataset.approve, 'APPROVED', 'Approved.')));
     document.querySelectorAll('[data-reject]').forEach((b) => b.addEventListener('click', () => {
       const comment = prompt('Why are you rejecting this?');
