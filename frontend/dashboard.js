@@ -234,9 +234,11 @@
       )
       .each(function (d, i) {
         const el = this, p = pos.get(d.id), s = itemShape(d);
-        el.className = `fan-item ${d.kind}${d.kind === 'person' && d.status === 'INACTIVE' ? ' inactive' : ''}${d.alarm ? ' hot' : ''}${state.focus === d.id ? ' sel' : ''}`;
-        el.innerHTML = `<span class="dot" style="color:${s.color}"><svg viewBox="0 0 14 14">${s.svg}</svg></span>
+        const cls = `fan-item ${d.kind}${d.kind === 'person' && d.status === 'INACTIVE' ? ' inactive' : ''}${d.alarm ? ' hot' : ''}${state.focus === d.id ? ' sel' : ''}`;
+        if (el.className.replace(' dimmed', '').replace(' flare', '') !== cls) el.className = cls;
+        const html = `<span class="dot" style="color:${s.color}"><svg viewBox="0 0 14 14">${s.svg}</svg></span>
           <span><span class="label">${esc(d.name)}</span><span class="sub">${itemChips(d)}</span></span>`;
+        if (el.__html !== html) { el.innerHTML = html; el.__html = html; }
         const apply = () => {
           el.style.transform = `translate(${p.x}px, ${p.y - ITEM_MID}px)`;
           el.style.opacity = p.opacity;
