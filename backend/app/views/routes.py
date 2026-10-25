@@ -178,7 +178,7 @@ def list_approvals(
             "status": approval.status.value,
             "target_type": approval.target_type.value,
             "target_id": approval.target_id,
-            "lesson": (lesson.candidate_data or {}) if lesson else None,
+            "lesson": _lesson_candidate(lesson) if lesson else None,
             "lesson_case_id": lesson.source_case_id if lesson else None,
             "assigned_to": approval.assigned_to,
             "assigned_to_name": names.get(approval.assigned_to),
@@ -223,6 +223,12 @@ def list_policy_changes(db: Session = Depends(get_db)) -> list[dict]:
     ]
 
 
+def _lesson_candidate(record: LearningRecord) -> dict[str, Any]:
+    # The lesson itself sits under "candidate", next to the revision diff.
+    data = record.candidate_data or {}
+    return data.get("candidate") or data
+
+
 def _impact_target(db: Session, impact: PolicyImpact) -> dict[str, Any]:
     if impact.target_type == PolicyImpactTargetType.RESOURCE:
         resource = db.get(CompanyResource, impact.target_id)
@@ -239,7 +245,7 @@ def _impact_target(db: Session, impact: PolicyImpact) -> dict[str, Any]:
         }
     if impact.target_type == PolicyImpactTargetType.LEARNING:
         record = db.get(LearningRecord, impact.target_id)
-        candidate = (record.candidate_data or {}) if record else {}
+        candidate = _lesson_candidate(record) if record else {}
         return {
             "label": "Approved lesson",
             "lesson": candidate.get("recommended_action"),

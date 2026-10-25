@@ -93,9 +93,22 @@
       </div>
       <div class="card">
         <div class="card-head"><h2>What this change affects</h2><span class="spacer"></span><span class="faint">${v.impacts.length} impact(s)</span></div>
-        <div class="stack">${v.impacts.map(impactCard).join('') || '<div class="empty"><b>No impacts</b>Nothing depended on the old version.</div>'}</div>
+        <div class="stack">${impactList(v.impacts)}</div>
       </div>`;
     document.querySelectorAll('[data-fix]').forEach((b) => b.addEventListener('click', () => fix(b.dataset.fix, b.dataset.kind)));
+  }
+
+  // What needs a decision first, by risk; completed cases that only keep their
+  // history fold into one line so they do not crowd the screen.
+  function impactList(impacts) {
+    if (!impacts.length) return '<div class="empty"><b>No impacts</b>Nothing depended on the old version.</div>';
+    const rank = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    const history = impacts.filter((i) => i.recommended_action === 'NO_ACTION');
+    const actionable = impacts.filter((i) => i.recommended_action !== 'NO_ACTION')
+      .sort((a, b) => (rank[a.risk_level] ?? 3) - (rank[b.risk_level] ?? 3));
+    return actionable.map(impactCard).join('') + (history.length ? `
+      <details class="item"><summary class="faint" style="cursor:pointer">${history.length} completed case${history.length === 1 ? '' : 's'} kept as history, no action needed</summary>
+        <div class="stack" style="margin-top:10px">${history.map(impactCard).join('')}</div></details>` : '');
   }
 
   function impactCard(i) {
