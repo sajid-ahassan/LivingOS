@@ -2,8 +2,9 @@
 
 1. alembic upgrade head      (fresh database: creates the schema)
 2. Qdrant collection + index (fresh cluster)
-3. seed policies             (ACCESS, EQUIPMENT, OFFBOARDING, AGENT V1)
-4. seed company              (85 people, 24 agents, story characters)
+3. seed company              (85 people, 24 agents, story characters)
+4. seed policies             (ACCESS, EQUIPMENT, OFFBOARDING, AGENT V1;
+                              uploaded by Tahmid, so people come first)
 
 Every step is idempotent, so it is safe on the Supabase demo database too.
 In OFFLINE mode the policy embeddings must already be in data/demo_cache/
@@ -34,8 +35,8 @@ def main() -> None:
 
     print("1/4 database schema"); migrate()
     print("2/4 vector store"); print(" ", ensure_policy_collection()); print(" ", ensure_policy_version_index())
-    print("3/4 seed policies"); ingest_seed_policies.main()
-    print("4/4 demo company"); seed_company.main()
+    print("3/4 demo company"); seed_company.main()
+    print("4/4 seed policies"); ingest_seed_policies.main()
     print("\nReady. Start the API, the frontend and (optionally) the MCP gateway.")
 
 

@@ -39,6 +39,9 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql://livingops:livingops-local@postgres:5432/livingops
+      # Settings ignore case, so a lowercase key from .env would compete with
+      # the one above and could point bootstrap at the hosted database.
+      database_url: postgresql://livingops:livingops-local@postgres:5432/livingops
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: local
       DEMO_MODE: ${DEMO_MODE:-OFFLINE}
