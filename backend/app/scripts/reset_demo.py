@@ -67,6 +67,9 @@ def reset_demo_data(*, reset_policies: bool = True) -> dict[str, int]:
     """
     Clear deterministic demo transactional data and restore the seed company.
 
+    Run restore_github_demo first when the real GitHub org is in use: it
+    saves the bot's new deploy key id, which seed_company then links.
+
     With reset_policies (the default), every seed policy is then brought back
     to V1 by app.scripts.reset_policies, which also cleans the Qdrant points of
     removed versions, so a rehearsal can activate Access Policy V2 again.
@@ -190,6 +193,11 @@ def main() -> None:
         description="Reset LivingOps deterministic demo data."
     )
     parser.add_argument(
+        "--skip-github",
+        action="store_true",
+        help="Do not restore the GitHub demo org (Arif's access, bot key).",
+    )
+    parser.add_argument(
         "--yes",
         action="store_true",
         help="Skip confirmation.",
@@ -203,6 +211,14 @@ def main() -> None:
         if answer not in {"y", "yes"}:
             print("Reset cancelled.")
             return
+
+    if not args.skip_github:
+        from app.github.restore import restore_github_demo
+
+        github = restore_github_demo()
+        print("GitHub demo org:", github)
+        if github.get("arif_access") == "invitation pending":
+            print("Accept the aurora invitation with Arif's test account.")
 
     counts = reset_demo_data()
     _print_summary(counts)

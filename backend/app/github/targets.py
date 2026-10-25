@@ -86,3 +86,37 @@ def build_github_parameters(
         "public_key": new_public_key(title),
         "read_only": read_only,
     }
+
+
+def build_grant_github_parameters(
+    parameters: dict[str, Any],
+    resource_key: str,
+    *,
+    settings: Settings,
+    idempotency_key: str,
+    new_public_key: Callable[[str], str],
+) -> dict[str, Any] | None:
+    """A temporary grant on the demo repository becomes its own deploy key.
+
+    The grant resource does not exist yet, so the parameters come from the
+    access request. Other repositories are not in the demo org and stay on
+    the mock path. Expiry or release later deletes the key (REVOKE).
+    """
+    if not settings.github_enabled or settings.demo_mode.upper() == "OFFLINE":
+        return None
+    if (
+        parameters.get("kind") != "temporary_grant"
+        or parameters.get("system") != "github"
+        or parameters.get("repository") != settings.github_repo
+    ):
+        return None
+
+    title = key_title(resource_key, idempotency_key)
+    return {
+        "owner": settings.github_org,
+        "repo": settings.github_repo,
+        "kind": "deploy_key",
+        "key_title": title,
+        "public_key": new_public_key(title),
+        "read_only": parameters.get("permission") != "write",
+    }

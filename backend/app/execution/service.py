@@ -17,7 +17,7 @@ from app.enums import (
 from app.execution.n8n_client import N8NDispatchError, dispatch_to_n8n
 from app.github.client import get_read_client
 from app.github.keys import generate_public_key
-from app.github.targets import build_github_parameters
+from app.github.targets import build_github_parameters, build_grant_github_parameters
 from app.github.verifier import GitHubVerification, verify_github_action
 from app.models import Case, CaseAction, CasePlan, CompanyResource
 from app.policy_guardian.resource_remediation import resolve_remediated_impact
@@ -100,6 +100,17 @@ def prepare_github_parameters(db: Session, action: CaseAction) -> None:
         )
     )
     if resource is None:
+        if action.action_type != ActionType.GRANT_TEMPORARY:
+            return
+        github = build_grant_github_parameters(
+            action_data.get("parameters") or {},
+            str(action_data.get("resource_key")),
+            settings=get_settings(),
+            idempotency_key=action.idempotency_key,
+            new_public_key=generate_public_key,
+        )
+        if github is not None:
+            action.requested_data = {**action_data, "github": github}
         return
 
     github = build_github_parameters(
@@ -458,7 +469,9 @@ def verify_action_resource(
     problems: list[str] = []
     github_check: GitHubVerification | None = None
     github_params = action_data.get("github")
-    if github_params and resource is not None:
+    if github_params and (
+        resource is not None or action.action_type == ActionType.GRANT_TEMPORARY
+    ):
         # Real GitHub: n8n's answer is not evidence. The backend checks
         # GitHub with its own read-only token and only then records the
         # change on the resource itself.
@@ -466,6 +479,8 @@ def verify_action_resource(
             action.action_type, github_params, get_read_client()
         )
         if github_check.ok:
+            if resource is None:
+                resource = _new_github_grant(db, action, case, github_params)
             _apply_verified_github_change(resource, action, github_check)
             db.flush()
         else:
@@ -579,6 +594,40 @@ def verify_action_resource(
         raise
 
     return action
+
+
+def _new_github_grant(
+    db: Session,
+    action: CaseAction,
+    case: Case,
+    github_params: dict[str, Any],
+) -> CompanyResource:
+    """Create the grant once GitHub confirmed its deploy key; the key id is
+    filled in by _apply_verified_github_change."""
+    details = dict((action.requested_data or {}).get("parameters") or {})
+    details["github"] = {"repo": github_params["repo"]}
+    resource = CompanyResource(
+        person_id=case.subject_person_id,
+        resource_type=action.resource_type,
+        resource_key=(action.requested_data or {})["resource_key"],
+        status=target_resource_state(action.action_type, action.resource_type),
+        details_data=details,
+        source_action_id=action.id,
+        idempotency_key=action.idempotency_key,
+    )
+    db.add(resource)
+    db.flush()
+    record_audit_event(
+        db,
+        actor_type=AuditActorType.SYSTEM,
+        event_type="RESOURCE_GRANTED_TEMPORARILY",
+        entity_type="company_resource",
+        entity_id=resource.id,
+        after_data={"resource_key": resource.resource_key, "github": details["github"]},
+        evidence_data={"action_id": str(action.id)},
+        correlation_id=case.id,
+    )
+    return resource
 
 
 def _apply_verified_github_change(

@@ -12,7 +12,7 @@ from app.execution import service as execution_service
 from app.execution.n8n_client import N8NDispatchError, check_reported_status
 from app.github.client import GitHubReadClient, GitHubReadError
 from app.github.keys import key_title
-from app.github.targets import build_github_parameters
+from app.github.targets import build_github_parameters, build_grant_github_parameters
 from app.github.verifier import GitHubVerification, verify_github_action
 from app.models import Case, CaseAction, CompanyResource
 from app.notifications import service as notifications
@@ -406,3 +406,74 @@ def test_executor_answers_with_status_and_webhooks_need_the_token():
     nodes = {node["name"]: node for node in executor["nodes"]}
     assert nodes["Webhook"]["parameters"]["authentication"] == "headerAuth"
     assert "SUCCEEDED" in nodes["Respond success"]["parameters"]["responseBody"]
+
+
+# Temporary grants on the demo repository get their own deploy key
+
+
+def _grant_params(parameters, settings=None):
+    return build_grant_github_parameters(
+        parameters,
+        "credential:aurora-release-bot:grant:abcd1234",
+        settings=settings or _settings(),
+        idempotency_key="case:1:plan:2:action:3",
+        new_public_key=lambda title: f"ssh-ed25519 AAAATEST {title}",
+    )
+
+
+GRANT = {"kind": "temporary_grant", "system": "github", "repository": "aurora",
+         "permission": "write", "duration_minutes": 120}
+
+
+def test_write_grant_on_demo_repo_adds_a_write_key():
+    params = _grant_params(GRANT)
+    assert params["kind"] == "deploy_key" and params["read_only"] is False
+    assert "key_id" not in params
+    assert params["key_title"].startswith("livingops:credential:aurora-release-bot:grant:")
+
+
+def test_read_grant_adds_a_read_only_key():
+    assert _grant_params({**GRANT, "permission": "read"})["read_only"] is True
+
+
+def test_grant_outside_the_demo_repo_or_offline_stays_mock():
+    assert _grant_params({**GRANT, "repository": "helios"}) is None
+    assert _grant_params(GRANT, _settings(demo_mode="OFFLINE")) is None
+
+
+def test_verified_grant_creates_the_resource_with_its_key(monkeypatch):
+    added = []
+
+    class FakeDb:
+        def add(self, row):
+            added.append(row)
+
+        def flush(self):
+            pass
+
+    monkeypatch.setattr(execution_service, "record_audit_event", lambda db, **kw: None)
+    case = Case(id=uuid4(), case_type=CaseType.ACCESS_REQUEST, subject_person_id=uuid4())
+    action = CaseAction(
+        id=uuid4(),
+        action_type=ActionType.GRANT_TEMPORARY,
+        resource_type=ResourceType.AGENT_CREDENTIAL,
+        requested_data={"resource_key": "credential:aurora-release-bot:grant:abcd1234",
+                        "parameters": dict(GRANT)},
+        status=ActionState.SUCCEEDED,
+        idempotency_key="case:1:plan:2:action:3",
+    )
+    grant = execution_service._new_github_grant(FakeDb(), action, case, {"repo": "aurora"})
+    execution_service._apply_verified_github_change(grant, action, GitHubVerification(True, new_key_id=88))
+    assert added == [grant]
+    assert grant.person_id == case.subject_person_id
+    assert grant.status == ResourceState.ACTIVE
+    assert grant.details_data["github"]["key_id"] == 88
+    assert grant.details_data["kind"] == "temporary_grant"
+    assert grant.source_action_id == action.id
+
+
+def test_expiry_of_a_github_grant_deletes_its_key():
+    grant = _credential(key_id=88)
+    grant.resource_key = "credential:aurora-release-bot:grant:abcd1234"
+    params = _params(ActionType.REVOKE, grant)
+    assert params["kind"] == "deploy_key" and params["key_id"] == 88

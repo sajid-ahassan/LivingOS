@@ -64,11 +64,17 @@ cd ..\frontend; python serve_frontend.py # UI on :5173
 python -m mcp_server                     # optional: MCP gateway on :8765 (from the project root)
 ```
 
-Reset between rehearsals (cases, approvals, lessons, policies back to V1):
+Reset between rehearsals (cases, approvals, lessons, policies back to V1,
+and the GitHub demo org: stray LivingOps deploy keys removed, the bot's write
+key re-added through n8n, Arif given write access again):
 
 ```powershell
 cd backend; python -m app.scripts.reset_demo --yes
 ```
+
+`--skip-github` leaves GitHub alone. If Arif is an outside collaborator,
+GitHub sends him an invitation instead of access; accept it with his test
+account (the reset prints `invitation pending`).
 
 ## Demo modes
 
