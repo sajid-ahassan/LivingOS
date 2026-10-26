@@ -272,3 +272,24 @@ Before: press **Reset demo** and wait for the reload; open the two GitHub tabs (
 10. Dashboard: insight panel KPIs → slow pull-back on the full map. *(Part 5)*
 
 After recording: press **Reset demo** so judges see a clean start.
+
+---
+
+## Voiceover for the edited cut (media/livingops-prelim-cut.mp4, 2:57)
+
+Written against the actual cut. Each block starts when its scene starts; about 2.3 words per second leaves room to breathe. The collaborators page after execution was not refreshed in the recording, so it is not shown; the deploy-key page is the on-screen proof.
+
+| Cut time | On screen | Say |
+| --- | --- | --- |
+| 0:00–0:30 | Workforce map, orb with red particles, "5 need an owner", 79.2% | Every company now runs two kinds of workforce: people and AI agents. But nobody owns the access in between. 79% of people say an account stayed active after they left a job. 82% of companies found AI agents nobody knew about. This map is our demo company: every red point is an agent with no owner. |
+| 0:30–0:44 | Arif's panel: departing, two agents | LivingOps AI governs the whole lifecycle of people and AI agents: onboarding, offboarding, agent access, and policy changes. Arif is leaving, and he sponsors two agents. |
+| 0:44–1:00 | Approvals and Guardian pages, then GitHub: the bot's write key | Every access has an owner, a policy reason, an expiry and proof. Here is the real GitHub repository: the release bot holds a write key. |
+| 1:00–1:09 | Start offboarding; AI drafting (sped up) | HR starts the offboarding, and the AI drafts the plan from our own policies. |
+| 1:09–1:23 | Plan, then "Why?" with policy clauses | Email, GitHub, laptop, handover, and both agents. Every step shows why, citing the exact policy clause. |
+| 1:23–1:44 | Nabil revises: bot read-only; approve; execute | Nabil, the manager, keeps the release bot but makes it read-only under himself. He approves, and we execute. |
+| 1:44–1:57 | Steps verified one by one (sped up); completed | n8n changes the real systems, and our backend verifies each change on GitHub itself, never trusting the automation's word. |
+| 1:57–2:01 | GitHub: the bot's key is now read-only | Here is the proof: the bot's key is now read-only. |
+| 2:01–2:11 | Approvals: the bot's MCP request, HIGH tier, AI note; approve | Agents ask for access through our MCP gateway. Rules set the risk; this write request needs the IT owner, and it expires on its own. |
+| 2:11–2:26 | Policy V2: old vs new rules; impacts | When the policy changes, Policy Guardian re-checks every past decision: the agent's live write access and two sponsor changes now need action. |
+| 2:26–2:31 | Downscope remediation approved | One approval brings it back into compliance. |
+| 2:31–2:57 | Final map, KPIs (2.6 min, 100%), Nabil with his agents | On our demo company, all access closed in under three minutes, and every change carries a policy reason. LivingOps is built for 100 to 500 person companies, starting in Bangladesh. Next: Bangla explanations, more connectors, and our first pilots. LivingOps AI. Every access has an owner. |
