@@ -146,14 +146,87 @@ Claude Code (Anthropic) as the AI pair-engineer for architecture, implementation
 
 ## 180-second video script
 
-Record at 1440×900 or larger, browser zoom 100%, LIVE mode, after `reset_demo`. Speak calmly; the screen does the talking.
+About 410 spoken words (≈140 words per minute). Record at 1440×900 or larger, browser zoom 100%, LIVE mode, after `reset_demo`. Speak calmly and let the screen move with your words. Record each part separately and join them; keep the final cut at or under 3:00.
 
-| Time | Screen | Say |
-| --- | --- | --- |
-| 0:00–0:30 Problem | Dashboard: the orb with red particles, "5 need an owner"; zoom on the KPI panel | "Companies now run people and AI agents side by side. 79% of people say an account stayed active after they left a job, and 82% of companies found AI agents nobody knew about. In Bangladesh's 4,500 software companies, offboarding is still a checklist. Who owns each access? Usually, nobody." |
-| 0:30–1:00 Solution | Click Engineering; hover Arif → his two agents light up | "LivingOps AI is one lifecycle for people and AI agents. Every access has an owner, a policy reason, an expiry and proof. Arif is leaving, and he sponsors two agents with write access to our confidential repo." |
-| 1:00–2:00 Demo | Start Arif's offboarding → plan with "Why?" open on one step → Nabil revises bot to read-only → approve → execute; stopwatch; GitHub collaborators/keys page refreshed; back to map: bot glides under Nabil | "The AI drafts the plan from our own policies — every step cites the clause. Nabil keeps the release bot but makes it read-only; that correction becomes an approved lesson. n8n executes only what was approved, on real GitHub, and our backend verifies it with its own read-only token. All access closed in under two minutes." |
-| 2:00–2:30 AI approach | Approvals: the bot's MCP request with AI note and HIGH tier → approve; then Guardian: Policy V2 side-by-side, impacts in red | "Under the hood: LangGraph planners over hybrid RAG on Qdrant, deterministic risk rules, an MCP gateway for agents, and Policy Guardian: when the policy changes, it finds the live agent access and the lesson that now break it." |
-| 2:30–3:00 Impact | Insight panel KPIs; one line on Bangla and pricing | "Measured on our demo company: access closed in 1.9 minutes, 100% of changes with a policy reason, orphan agents caught automatically. Next: Bangla explanations, Google Workspace and Microsoft 365 connectors, and pilots with Bangladeshi software companies — at a fraction of enterprise prices." |
+### Before you press record
 
-Recording tips: pre-warm the backend (open the site 2 minutes before); keep a GitHub tab open on the aurora repo's deploy keys page; record each segment separately and join them; keep the final cut at or under 3:00.
+- Open https://livingops-frontend.onrender.com two minutes early (wakes the backend), or run locally.
+- Tabs ready: (1) Dashboard, (2) GitHub → aurora repo → Settings → Deploy keys, (3) GitHub → aurora → Settings → Collaborators.
+- "Acting as" starts on Farhana Islam (HR Manager).
+- Close notifications; hide bookmarks bar.
+
+---
+
+### Part 1 — Problem (0:00–0:30) · ~70 words
+
+| Time | On screen |
+| --- | --- |
+| 0:00 | Dashboard, full map. Slowly move the mouse over the orb's red particles. |
+| 0:12 | Point at the orb label "5 need an owner". |
+| 0:20 | Point at the insight panel: "Agents with an active sponsor 79.2%". |
+
+**Say:**
+"Every company now runs two kinds of workforce: people and AI agents. But nobody owns the access in between. 79% of people say an account stayed active after they left a job. 82% of companies found AI agents nobody knew about, and only one in five has a way to retire them. Here in Bangladesh's four and a half thousand software companies, this is still a manual checklist."
+
+---
+
+### Part 2 — Solution (0:30–1:00) · ~75 words
+
+| Time | On screen |
+| --- | --- |
+| 0:30 | Hover the nav: Cases, Approvals, Policy Guardian (the whole lifecycle). |
+| 0:42 | Back on the map: click the Engineering card; the fan opens. |
+| 0:50 | Hover Arif Hossain; his two agents light up. Click Arif; the panel shows his access and agents. |
+
+**Say:**
+"LivingOps AI governs the whole lifecycle of people and AI agents: onboarding, offboarding, agent access requests, and policy changes. One rule: every access has an owner, a policy reason, an expiry, and proof. When something breaks that rule, LivingOps finds it and fixes it, with human approval. Let me show one real story. Arif is leaving, and he sponsors two AI agents with write access to our confidential repository."
+
+---
+
+### Part 3 — Demo (1:00–2:00) · ~145 words
+
+| Time | On screen |
+| --- | --- |
+| 1:00 | Panel: "Start offboarding". The workspace opens; the AI plan appears (stopwatch starts). |
+| 1:12 | Click "Why?" on the GitHub revoke step: the cited policy clause shows. |
+| 1:22 | Switch "Acting as" to Nabil. "Revise as manager": set Aurora Release Bot's credential to DOWNSCOPE, type the correction, save. Approve. |
+| 1:38 | "Execute approved plan". Steps turn green one by one; "verified by GitHub API" chips appear. |
+| 1:48 | Switch to the GitHub tabs: Arif is gone from collaborators; the bot's key is now read-only. |
+| 1:55 | Back to the map: the bot sits under Nabil; stopwatch shows the total. |
+
+**Say:**
+"HR starts the offboarding. The AI reads our own company policies and drafts the full plan: email, GitHub, laptop, handover, and both agents. Every step shows why, with the exact policy clause it relies on. Nabil, Arif's manager, keeps the release bot running, but makes it read-only under himself. That correction becomes an approved lesson the system learns from. Now we execute. n8n changes the real GitHub organisation, and our backend checks GitHub itself with a separate read-only token. We never trust the automation's word. Here it is on GitHub: Arif's access is gone, and the bot's key is read-only. Everything closed in under two minutes, with proof."
+
+---
+
+### Part 4 — AI approach (2:00–2:30) · ~70 words
+
+| Time | On screen |
+| --- | --- |
+| 2:00 | Approvals as Tahmid: the bot's MCP request for 2 hours of write, HIGH tier, AI note. Approve. |
+| 2:12 | Policy Guardian: activate Access Policy V2. Old and new rules side by side; the new rules glow green. |
+| 2:22 | Scroll to impacts: the live grant and the lesson flagged in red. Click remediate. |
+
+**Say:**
+"Agents also ask for access through our MCP gateway. Deterministic rules set the risk: this write request needs the IT owner, and it expires on its own. Under the hood: LangGraph planners, hybrid RAG on Qdrant, and rules, not the LLM, for every risk decision. And when the policy changes, Policy Guardian re-checks every past decision, here a live agent grant and a lesson that now break the new rule."
+
+---
+
+### Part 5 — Impact and next step (2:30–3:00) · ~65 words
+
+| Time | On screen |
+| --- | --- |
+| 2:30 | Dashboard insight panel: KPIs (termination to access closed, policy reason 100%, sponsor coverage). |
+| 2:45 | Slowly pull back to the full map; end on the LivingOps logo. |
+
+**Say:**
+"On our demo company, every access closed within two minutes of termination, and every change carries a policy reason. LivingOps is built for 100 to 500 person companies, starting in Bangladesh, at a fraction of enterprise prices. Next: Bangla explanations, Google Workspace and Microsoft 365 connectors, and our first pilots. LivingOps AI. Every access has an owner."
+
+---
+
+### Recording tips
+
+- Say numbers exactly as they appear on screen that day (the stopwatch may show 1.8 or 2.1 minutes; read what you see).
+- If a step is slow, cut the waiting in editing; never speed up your voice.
+- Part 3 is the longest: rehearse the clicks twice before recording.
+- After recording, ask for `reset_demo` so judges see a clean demo.
