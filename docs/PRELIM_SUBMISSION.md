@@ -230,3 +230,45 @@ About 410 spoken words (≈140 words per minute). Record at 1440×900 or larger,
 - If a step is slow, cut the waiting in editing; never speed up your voice.
 - Part 3 is the longest: rehearse the clicks twice before recording.
 - After recording, ask for `reset_demo` so judges see a clean demo.
+
+---
+
+## Split version: record the voice and the screen separately
+
+Record the **screen** first (all clicks, with every wait — length does not matter), then read the **voiceover** in one quiet take, then cut the screen footage to match the voice in Clipchamp. Speed up or cut the waits; label sped-up parts "sped up 10×".
+
+### A. Voiceover (read aloud, ~372 words ≈ 2:40)
+
+Pause about one second between parts. Target time per part in brackets.
+
+**Part 1 — Problem (0:00–0:30)**
+Every company now runs two kinds of workforce: people and AI agents. But nobody owns the access in between. 79% of people say an account stayed active after they left a job. 82% of companies found AI agents nobody knew about, and only one in five has a way to retire them. Here in Bangladesh's four and a half thousand software companies, this is still a manual checklist.
+
+**Part 2 — Solution (0:30–1:00)**
+LivingOps AI governs the whole lifecycle of people and AI agents: onboarding, offboarding, agent access requests, and policy changes. One rule: every access has an owner, a policy reason, an expiry, and proof. When something breaks that rule, LivingOps finds it and fixes it, with human approval. Let me show one real story. Arif is leaving, and he sponsors two AI agents with write access to our confidential repository.
+
+**Part 3 — Demo (1:00–2:00)**
+HR starts the offboarding. The AI reads our own company policies and drafts the full plan: email, GitHub, laptop, handover, and both agents. Every step shows why, with the exact policy clause it relies on. Nabil, Arif's manager, keeps the release bot running, but makes it read-only under himself. That correction becomes an approved lesson the system learns from. Now we execute. n8n changes the real GitHub organisation, and our backend checks GitHub itself with a separate read-only token. We never trust the automation's word. Here it is on GitHub: Arif's access is gone, and the bot's key is read-only. Everything closed in under two minutes, with proof.
+
+**Part 4 — AI approach (2:00–2:30)**
+Agents also ask for access through our MCP gateway. Deterministic rules set the risk: this write request needs the IT owner, and it expires on its own. Under the hood: LangGraph planners, hybrid RAG on Qdrant, and rules, not the LLM, for every risk decision. And when the policy changes, Policy Guardian re-checks every past decision, here a live agent grant and a lesson that now break the new rule.
+
+**Part 5 — Impact (2:30–3:00)**
+On our demo company, every access closed within two minutes of termination, and every change carries a policy reason. LivingOps is built for 100 to 500 person companies, starting in Bangladesh, at a fraction of enterprise prices. Next: Bangla explanations, Google Workspace and Microsoft 365 connectors, and our first pilots. LivingOps AI. Every access has an owner.
+
+### B. Screen capture checklist (do all of it; waits are cut later)
+
+Before: press **Reset demo** and wait for the reload; open the two GitHub tabs (Deploy keys, Collaborators); Acting as = Farhana.
+
+1. Dashboard: slow mouse over the orb's red particles → point at "5 need an owner" → point at "79.2%". *(Part 1)*
+2. Hover nav: Cases, Approvals, Policy Guardian → click Engineering → hover Arif (agents light up) → click Arif. *(Part 2)*
+3. **Start offboarding** → **Generate AI plan** *(wait)* → **Why?** on the GitHub revoke step. *(Part 3)*
+4. Acting as → Nabil → **Revise as manager** → credential DOWNSCOPE → type the correction → **Save revision and send for approval** → **Approve plan**. *(Part 3)*
+5. **Execute approved plan** *(wait ~90 s; keep recording — steps turn green)*. *(Part 3)*
+6. GitHub tabs: refresh Collaborators (Arif gone) and Deploy keys (bot key read-only). *(Part 3)*
+7. Back in the workspace: **Turn the correction into a lesson** *(wait)*. Dashboard: bot now under Nabil. *(Part 3)*
+8. Terminal: `newenv\Scripts\python.exe -m mcp_server.demo_client --url https://livingops-mcp.onrender.com/mcp --wait 300` → Acting as → Tahmid → **Approvals**: approve the lesson, then the bot's HIGH request (AI note visible) *(wait for ACTIVE)*. *(Part 4)*
+9. **Policy Guardian** → **Activate Access Policy V2** *(wait)* → old vs new rules → scroll to the red impacts → **Downscope to read-only** on the live grant → approve it on Approvals. *(Part 4)*
+10. Dashboard: insight panel KPIs → slow pull-back on the full map. *(Part 5)*
+
+After recording: press **Reset demo** so judges see a clean start.
