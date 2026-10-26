@@ -281,9 +281,12 @@ Written against the actual cut. Each block starts when its scene starts; about 2
 
 | Cut time | On screen | Say |
 | --- | --- | --- |
-| 0:00–0:30 | Workforce map, orb with red particles, "5 need an owner", 79.2% | Every company now runs two kinds of workforce: people and AI agents. But nobody owns the access in between. 79% of people say an account stayed active after they left a job. 82% of companies found AI agents nobody knew about. Only one in five has a way to retire them. This map is our demo company: every red point is an agent with no owner, and in Bangladesh's four and a half thousand software companies this is still a manual checklist. |
-| 0:30–0:44 | Arif's panel: departing, two agents | LivingOps AI governs the whole lifecycle of people and AI agents: onboarding, offboarding, agent access, and policy changes. Arif is leaving, and he sponsors two agents. |
-| 0:44–1:00 | Approvals and Guardian pages, then GitHub: the bot's write key | Every access has an owner, a policy reason, an expiry and proof. Here is the real GitHub repository: the release bot holds a write key. |
+| 0:00–0:10 | Workforce map, cursor moving across the top | Every company now runs two kinds of workforce: people, and AI agents. But who actually owns the access in between? |
+| 0:10–0:18 | Cursor over the list of people and agents | This is our demo company. Each person is listed with the AI agents they sponsor. |
+| 0:18–0:30 | Cursor on the orb's red points; 79.2% on the right | And every red point around this orb is an agent without an owner. 82% of companies have found agents nobody knew about, and 79% of people kept access after leaving a job. |
+| 0:30–0:44 | Click Arif; his panel: departing, two agents | Take Arif. He's a senior engineer, he's leaving, and he sponsors two AI agents with write access to our confidential repository. |
+| 0:44–0:50 | Approvals and Policy Guardian pages | LivingOps AI governs that whole lifecycle: approvals, policy changes, onboarding and offboarding. |
+| 0:50–1:00 | GitHub: the bot's write key, then Arif as a collaborator | And this is real GitHub. The release bot holds a write key, and Arif is still a collaborator. |
 | 1:00–1:09 | Start offboarding; AI drafting (sped up) | HR starts the offboarding, and the AI drafts the plan from our own policies. |
 | 1:09–1:23 | Plan, then "Why?" with policy clauses | Email, GitHub, laptop, handover, and both agents. Every step shows why, citing the exact policy clause. |
 | 1:23–1:44 | Nabil revises: bot read-only; approve; execute | Nabil, the manager, keeps the release bot but makes it read-only under himself. His correction is recorded, and the revised plan goes to him for approval. Nothing runs until a human approves it. He approves, and we execute. |
