@@ -72,7 +72,7 @@ key re-added through n8n, Arif given write access again):
 cd backend; python -m app.scripts.reset_demo --yes
 ```
 
-`--skip-github` leaves GitHub alone. If Arif is an outside collaborator,
+The same reset is available in the app: **Reset demo** (top right) asks for confirmation, runs on the server in the background (2-3 minutes) and reloads the page when done (`POST /demo/reset`, status at `GET /demo/reset`). `--skip-github` leaves GitHub alone. If Arif is an outside collaborator,
 GitHub sends him an invitation instead of access; accept it with his test
 account (the reset prints `invitation pending`).
 

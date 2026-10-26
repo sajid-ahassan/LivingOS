@@ -128,6 +128,7 @@
           <nav class="nav pill">${nav}</nav>
           <div class="right">
             <span id="mode-badge" class="badge idle">connecting</span>
+            <button class="btn small" id="reset-demo" title="Reset the demo company, policies and GitHub demo org">Reset demo</button>
             <label class="persona" title="Acting as"><span class="avatar" id="persona-initials"></span><select id="persona-select">${options}</select></label>
           </div>
         </header>
@@ -137,6 +138,7 @@
         </div>
       </div>`);
     const select = document.getElementById('persona-select');
+    document.getElementById('reset-demo').addEventListener('click', resetDemo);
     select.value = persona();
     const initials = () => { document.getElementById('persona-initials').textContent = actingAs().name.split(' ').map((p) => p[0]).join(''); };
     initials();
@@ -144,6 +146,33 @@
     refreshChrome();
     setInterval(refreshChrome, 10000);
     return document.getElementById('page');
+  }
+
+  // Demo reset: same as `python -m app.scripts.reset_demo --yes`. It runs on
+  // the server in the background (minutes), so poll until it finishes.
+  async function resetDemo() {
+    const ok = confirm('Reset the demo?\n\nThis deletes all demo cases, approvals and lessons, puts policies back on V1, and restores the GitHub demo org (Arif\'s access, the bot\'s write key). It takes 2-3 minutes.');
+    if (!ok) return;
+    const button = document.getElementById('reset-demo');
+    button.disabled = true;
+    try {
+      await api('/demo/reset', { method: 'POST' });
+    } catch (error) {
+      if (error.status !== 409) { toast(error.message, 'error'); button.disabled = false; return; }
+    }
+    toast('Resetting the demo… this takes 2-3 minutes.');
+    const started = Date.now();
+    const timer = setInterval(async () => {
+      let status;
+      try { status = await api('/demo/reset'); } catch { return; }
+      const seconds = Math.round((Date.now() - started) / 1000);
+      button.textContent = status.state === 'running' ? `Resetting… ${seconds}s` : 'Reset demo';
+      if (status.state === 'running') return;
+      clearInterval(timer);
+      button.disabled = false;
+      if (status.state === 'done') { toast('Demo reset complete.'); setTimeout(() => location.reload(), 1200); }
+      else toast(`Reset failed: ${status.error || 'unknown error'}`, 'error');
+    }, 3000);
   }
 
   async function refreshChrome() {

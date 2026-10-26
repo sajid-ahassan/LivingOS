@@ -205,3 +205,29 @@ def test_settings_strip_pasted_newlines(monkeypatch):
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test\n")
     assert Settings().openai_api_key == "sk-test"
+
+
+def test_demo_reset_runs_once_in_background(monkeypatch):
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    from app.demo import routes
+    from app.main import app
+
+    release = threading.Event()
+    calls = []
+    monkeypatch.setattr("app.github.restore.restore_github_demo", lambda: calls.append("github") or {"skipped": "test"})
+    monkeypatch.setattr("app.scripts.reset_demo.reset_demo_data", lambda: release.wait(5) and {"cases": 0})
+    client = TestClient(app)
+    assert client.post("/demo/reset").json()["state"] == "running"
+    assert client.post("/demo/reset").status_code == 409
+    release.set()
+    for _ in range(50):
+        if client.get("/demo/reset").json()["state"] != "running":
+            break
+        threading.Event().wait(0.05)
+    assert client.get("/demo/reset").json()["state"] == "done"
+    assert calls == ["github"]
+    assert routes._reset_lock.acquire(blocking=False)
+    routes._reset_lock.release()
