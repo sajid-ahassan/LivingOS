@@ -144,7 +144,11 @@
     const el = document.getElementById('editor');
     const plan = latestPlan();
     el.classList.toggle('hidden', !state.editing || !plan);
-    if (!state.editing || !plan) return;
+    if (!state.editing || !plan) { el.dataset.plan = ''; return; }
+    // Polling re-renders the page every few seconds; build the editor once
+    // per plan so the manager's typing and choices are not wiped.
+    if (el.dataset.plan === plan.id) return;
+    el.dataset.plan = plan.id;
     el.innerHTML = `
       <div class="card-head"><h2>Revise as manager</h2><span class="spacer"></span><span class="faint">Acting as ${esc(actingAs().name)}</span></div>
       <div class="stack">${plan.actions.map((a) => {
