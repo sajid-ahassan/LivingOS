@@ -47,6 +47,7 @@ class LessonEvidence(BaseModel):
     learning_id: str
     status: str | None
     recommended_action: str | None
+    text: str | None = None
 
 
 class StepExplanation(BaseModel):
@@ -115,6 +116,7 @@ def _lesson_evidence(db: Session, evidence_id: str) -> LessonEvidence | None:
         learning_id=match["learning_id"],
         status=record.status.value if record else None,
         recommended_action=candidate.get("recommended_action"),
+        text=record.memory_text if record else None,
     )
 
 

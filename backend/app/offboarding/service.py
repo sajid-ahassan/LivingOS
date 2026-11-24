@@ -12,6 +12,7 @@ from app.enums import (
     CaseType,
     PlanState,
 )
+from app.learning.lessons import lesson_ids_in
 from app.models import Case, CasePlan, CompanyResource
 from app.offboarding.graph_runner import generate_offboarding_plan_via_graph
 from app.offboarding.schemas import OffboardingPlan
@@ -147,6 +148,11 @@ def create_offboarding_plan(db: Session, case_id: UUID) -> CasePlan:
                     for action in actions
                     for evidence_id in action.evidence_ids
                 }),
+                "lesson_ids": sorted(lesson_ids_in(
+                    evidence_id
+                    for action in actions
+                    for evidence_id in action.evidence_ids
+                )),
             },
             correlation_id=case.id,
         )

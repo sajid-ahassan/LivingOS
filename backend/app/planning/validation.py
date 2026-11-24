@@ -9,6 +9,7 @@ from app.offboarding.rules import (
     validate_access_evidence,
     validate_agent_coverage,
 )
+from app.learning.lessons import is_lesson_evidence
 from app.planning.schemas import GeneratedCasePlan
 
 
@@ -97,6 +98,16 @@ class GeneratedPlanValidationError(ValueError):
     pass
 
 
+def policy_first_errors(action) -> list[str]:
+    """A lesson may support a step, but only policy evidence can justify it."""
+    if any(not is_lesson_evidence(item) for item in action.evidence_ids):
+        return []
+    return [
+        f"Step {action.resource_key} cites only lessons; every step must "
+        "cite policy evidence, and a lesson ID may only appear next to it."
+    ]
+
+
 def validate_generated_plan(
     plan: GeneratedCasePlan,
     *,
@@ -104,6 +115,7 @@ def validate_generated_plan(
     policy_context: CasePolicyContextResponse,
     resources: list[CompanyResource],
     get_person: Callable[[UUID], Person | None] | None = None,
+    allowed_lesson_ids: frozenset[str] | set[str] = frozenset(),
 ) -> None:
     errors: list[str] = []
 
@@ -169,7 +181,7 @@ def validate_generated_plan(
             )
 
         invalid_evidence = set(action.evidence_ids).difference(
-            allowed_evidence_ids
+            allowed_evidence_ids | set(allowed_lesson_ids)
         )
 
         if invalid_evidence:
@@ -177,6 +189,8 @@ def validate_generated_plan(
                 f"Action {action.sequence} cites unavailable evidence: "
                 f"{sorted(invalid_evidence)}."
             )
+
+        errors.extend(policy_first_errors(action))
 
         existing_resource = resources_by_key.get(
             action.resource_key

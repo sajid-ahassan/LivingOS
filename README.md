@@ -10,7 +10,7 @@ Built for the International AI Builders Congress 2026, InfraSphere AI track (Wor
 
 1. **Problem.** A live map of Nexora Labs: about 85 people and 24 AI agents, joined by who sponsors which agent. Some agents are already orphaned.
 2. **Arif Hossain leaves.** HR opens his offboarding. The AI drafts the plan from policy: disable email, revoke GitHub, return the laptop, reassign work, and decide what happens to his two agents. Every step shows *why*: the policy clause it cites.
-3. **Manager correction.** Nabil keeps Aurora Release Bot but makes its deploy key read-only. The correction becomes an approved lesson.
+3. **Manager correction.** Nabil keeps Aurora Release Bot but makes its deploy key read-only. The correction becomes an approved lesson, which later offboarding plans cite (always next to policy evidence, and only while the policy it was made under is still current).
 4. **Execution and proof.** n8n runs each approved action; the backend checks GitHub with its own read-only token before anything counts as verified. A stopwatch shows termination-to-all-access-closed time.
 5. **The bot asks for access.** Over MCP, the bot asks for two hours of write access. Rules mark it HIGH risk, the IT Owner approves, access expires on its own. A low-risk read request is approved automatically.
 6. **Policy changes.** Access Policy V2 lands. Guardian flags the bot's live write access and the lesson; one approval downscopes the key.

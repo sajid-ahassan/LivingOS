@@ -188,13 +188,20 @@ def validate_agent_coverage(
     for resource in agent_resources:
         matching = planned.get(resource.resource_key, [])
         if len(matching) != 1:
+            found = (
+                "found none"
+                if not matching
+                else f"found {len(matching)}: "
+                + ", ".join(a.action_type.value for a in matching)
+                + "; keep one and delete the others"
+            )
             errors.append(
                 f"{resource.resource_type.value} {resource.resource_key} needs "
                 "exactly one offboarding action: "
                 + " or ".join(
                     sorted(a.value for a in allowed_offboarding_actions(resource))
                 )
-                + "."
+                + f" ({found})."
             )
             continue
         action = matching[0]
@@ -313,14 +320,17 @@ def agent_evidence_instruction(
     )
 
 
-def derive_agent_credential_actions(plan, resources: Iterable[CompanyResource]):
+def derive_agent_credential_actions(plan, resources: Iterable[CompanyResource], lessons=()):
     """Make each agent's credential follow the planner's decision for the agent.
 
     The planner decides an agent's fate (REASSIGN or REVOKE); what happens to
     its credential follows from that by rule, not judgment: REVOKE with
     REVOKE, REASSIGN with a REASSIGN (key rotation) to the same successor. Any
     credential action the model wrote for a linked credential is replaced.
-    A manager can still choose DOWNSCOPE in a revision. Returns a new plan.
+    A manager can still choose DOWNSCOPE in a revision. When the planner's
+    REASSIGN of an agent cites an approved lesson that recorded a credential
+    DOWNSCOPE (a past manager correction), the credential is downscoped to
+    that permission instead of rotated. Returns a new plan.
     """
     from app.planning.schemas import PlannedAction
 
@@ -341,6 +351,18 @@ def derive_agent_credential_actions(plan, resources: Iterable[CompanyResource]):
     def keep(action) -> bool:
         return action.resource_key not in linked
 
+    lesson_permissions = {
+        lesson.evidence_id: lesson.credential_permission
+        for lesson in lessons
+        if lesson.credential_permission
+    }
+
+    def lesson_permission(agent_action) -> tuple[str, str] | None:
+        for evidence_id in agent_action.evidence_ids:
+            if evidence_id in lesson_permissions:
+                return evidence_id, lesson_permissions[evidence_id]
+        return None
+
     revocations = [a for a in plan.revocations if keep(a)]
     reassignments = [a for a in plan.reassignments if keep(a)]
 
@@ -359,6 +381,27 @@ def derive_agent_credential_actions(plan, resources: Iterable[CompanyResource]):
                 evidence_ids=list(agent_action.evidence_ids),
             )
             revocations.append(derived)
+        elif agent_action.action_type == ActionType.REASSIGN and lesson_permission(agent_action):
+            lesson_id, permission = lesson_permission(agent_action)
+            derived = PlannedAction(
+                sequence=agent_action.sequence,
+                action_type=ActionType.DOWNSCOPE,
+                resource_type=ResourceType.AGENT_CREDENTIAL,
+                resource_key=credential_key,
+                requested_data={
+                    "successor_person_id": agent_action.requested_data.get(
+                        "successor_person_id"
+                    ),
+                    "permission": permission,
+                },
+                reason=(
+                    f"Credential moves with its agent {agent_action.resource_key} "
+                    f"and is reduced to {permission}, as approved lesson "
+                    f"{lesson_id} recorded."
+                ),
+                evidence_ids=list(agent_action.evidence_ids),
+            )
+            reassignments.append(derived)
         elif agent_action.action_type == ActionType.REASSIGN:
             derived = PlannedAction(
                 sequence=agent_action.sequence,

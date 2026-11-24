@@ -9,6 +9,7 @@ from qdrant_client.models import (
     Filter,
     MatchValue,
     PayloadSchemaType,
+    PointIdsList,
     PointStruct,
     VectorParams,
 )
@@ -236,3 +237,22 @@ def search_learning_memory(
         )
 
     return results
+
+
+def delete_learning_points(point_ids: list[UUID]) -> int:
+    """Remove lesson points whose learning records are being deleted."""
+    if not point_ids:
+        return 0
+    collection_name = _collection_name()
+    client = get_qdrant_client()
+    try:
+        if not client.collection_exists(collection_name):
+            return 0
+        client.delete(
+            collection_name=collection_name,
+            points_selector=PointIdsList(points=[str(item) for item in point_ids]),
+            wait=True,
+        )
+    finally:
+        client.close()
+    return len(point_ids)

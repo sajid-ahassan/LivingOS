@@ -32,6 +32,12 @@ AI agent rules (the departing employee is the agent's human sponsor):
 16. Every agent and credential action must cite ACCESS policy evidence, and AGENT policy evidence when it is supplied. Use exactly the IDs listed under REQUIRED CITATIONS in the policy evidence.
 17. Never leave an agent or credential with the departing employee.
 
+Approved lessons (past manager corrections that a reviewer approved):
+18. Lessons are advisory and rank below policy. Apply a lesson only when its situation matches this case (for example the agent's purpose) and it agrees with the policy evidence; when they conflict, policy wins and you ignore the lesson.
+19. Applying a lesson never adds actions: each resource still gets exactly one action. For an agent, choose REASSIGN or REVOKE, never both.
+20. Every step that follows a lesson lists the lesson ID (MEM-...) in its evidence_ids together with its policy evidence IDs. A lesson ID never replaces policy evidence.
+21. When an applicable lesson says a departing sponsor's agent should keep running under the successor, REASSIGN that agent to the successor and cite the lesson ID on the agent step. Still write no credential action (rule 14): LivingOps applies the lesson's recorded credential change.
+
 Handover rules:
 - Generate concise handover topics from authorized work-item/document metadata only.
 - Generate targeted questions about unfinished work, recurring tasks, operational failures, important contacts, and undocumented procedures when relevant.
@@ -57,6 +63,9 @@ Authorized resource inventory:
 
 Policy evidence:
 {policy_evidence}
+
+Approved lessons (advisory, below policy):
+{approved_lessons}
 
 Create the structured offboarding plan.
 """,

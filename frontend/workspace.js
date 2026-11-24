@@ -126,7 +126,7 @@
     const policies = step.policy_evidence.map((p) => `
       <div><div class="chips"><span class="chip">${esc(p.evidence_id)}</span>${badge(p.status || 'ARCHIVED', `${p.policy_code} V${p.version_number} ${human(p.status || '')}`)}</div>
         ${p.clauses.map((c) => `<div class="clause"><span class="n">${c.number}.</span>${esc(c.text)}</div>`).join('')}</div>`).join('');
-    const lessons = step.lessons.map((l) => `<div class="ai-note"><b>Approved lesson</b><br>${esc(l.recommended_action || l.learning_id)} ${badge(l.status)}</div>`).join('');
+    const lessons = step.lessons.map((l) => `<div class="ai-note"><div class="chips"><span class="chip">${esc(l.evidence_id)}</span>${badge(l.status || 'ARCHIVED')}</div>${esc(l.text || l.recommended_action || l.learning_id)}<div class="faint">Advisory: a past manager correction, approved by a reviewer. Policy above still decides.</div></div>`).join('');
     return `<div class="why">
       <div class="chips">
         ${badge('VERIFIED', `validation ${validation.deterministic_validation || 'passed'}`)}

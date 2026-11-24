@@ -22,6 +22,7 @@ from app.models import (
     PolicyLink,
     PolicyVersion,
 )
+from app.learning.lessons import is_lesson_evidence
 from app.planning.graph_runner import generate_case_plan_via_graph
 from app.planning.schemas import GeneratedCasePlan, PlannedAction
 
@@ -90,10 +91,12 @@ def build_policy_links(
         for item in policy_context.evidence
     }
 
+    # Lesson IDs are advisory citations, not policy: they get no policy link.
     used_evidence_ids = {
         evidence_id
         for action in generated_plan.actions
         for evidence_id in action.evidence_ids
+        if not is_lesson_evidence(evidence_id)
     }
 
     evidence_by_policy: dict[tuple[str, int], set[str]] = {}

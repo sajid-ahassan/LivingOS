@@ -17,6 +17,7 @@ from app.models import (
     LearningRecord,
     PolicyLink,
 )
+from app.rag.learning_memory import delete_learning_points
 from app.scripts.reset_policies import reset_seed_policies
 from app.scripts.seed_company import build_company, seed_company
 
@@ -106,6 +107,16 @@ def reset_demo_data(*, reset_policies: bool = True) -> dict[str, int]:
             )
             counts["approvals"] = result.rowcount or 0
 
+            lesson_point_ids = [
+                point_id
+                for point_id in db.scalars(
+                    select(LearningRecord.qdrant_point_id).where(
+                        LearningRecord.id.in_(learning_ids)
+                    )
+                )
+                if point_id is not None
+            ] if learning_ids else []
+
             if learning_ids:
                 result = db.execute(
                     delete(LearningRecord).where(
@@ -164,6 +175,14 @@ def reset_demo_data(*, reset_policies: bool = True) -> dict[str, int]:
             counts["restored_resources"] = resource_count
 
             db.commit()
+
+            # A lesson left in Qdrant without its record would be filtered by
+            # the planner anyway, but reset leaves memory as clean as the DB.
+            try:
+                counts["lesson_points"] = delete_learning_points(lesson_point_ids)
+            except Exception as exc:  # noqa: BLE001 - DB reset already committed
+                print(f"Warning: lesson vectors not removed from Qdrant: {exc}")
+                counts["lesson_points"] = 0
 
         except Exception:
             db.rollback()

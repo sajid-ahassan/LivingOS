@@ -14,6 +14,7 @@ from app.enums import (
     CaseState,
     PlanState,
 )
+from app.learning.lessons import usable_lesson_ids
 from app.models import Approval, Case, CasePlan, CompanyResource, Person
 from app.planning.schemas import GeneratedCasePlan
 from app.planning.service import build_case_action, build_policy_links
@@ -129,6 +130,10 @@ def revise_plan(
         policy_context=policy_context,
         resources=list(resources),
         get_person=lambda person_id: db.get(Person, person_id),
+        allowed_lesson_ids=usable_lesson_ids(
+            db,
+            [item for action in replacement.actions for item in action.evidence_ids],
+        ),
     )
 
     approver = _resolve_approver(db, case)

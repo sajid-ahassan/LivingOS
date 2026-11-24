@@ -25,8 +25,14 @@ from app.offboarding.rules import (
     validate_access_evidence,
     validate_agent_coverage,
 )
+from app.learning.lessons import (
+    LessonContext,
+    format_lessons,
+    retrieve_offboarding_lessons,
+)
 from app.offboarding.schemas import OffboardingPlan
 from app.planning.prompt import format_policy_evidence
+from app.planning.validation import policy_first_errors
 
 
 class OffboardingPlanningError(ValueError):
@@ -88,6 +94,9 @@ Repair the supplied LivingOps offboarding plan.
 
 Return only a corrected OffboardingPlan structured object.
 Fix only the listed deterministic validation errors.
+Each resource gets exactly one action: delete duplicate actions, and delete
+actions for resources that need none. For an AI agent keep REASSIGN or REVOKE,
+never both.
 Use only supplied resources and evidence IDs.
 Do not invent company resources, successor IDs, policy rules, or approvals.
 Do not ask for or expose secrets/private data.
@@ -104,6 +113,9 @@ RESOURCE_INVENTORY:
 
 POLICY_EVIDENCE:
 {policy_evidence}
+
+APPROVED_LESSONS (advisory, below policy; cite next to policy evidence only):
+{approved_lessons}
 
 FAILED_PLAN:
 {failed_plan}
@@ -186,8 +198,10 @@ def _base_inputs(
     subject: Person,
     resources: list[CompanyResource],
     policy_context,
+    lessons: list[LessonContext] | None = None,
 ) -> dict:
     return {
+        "approved_lessons": format_lessons(lessons or []),
         "case_facts": json.dumps(
             jsonable_encoder(_normalised_case_facts(case)),
             indent=2,
@@ -212,6 +226,7 @@ def _validate_execution_plan(
     resources: list[CompanyResource],
     allowed_evidence_ids: set[str],
     policy_context,
+    allowed_lesson_ids: set[str] = frozenset(),
 ) -> list[str]:
     """
     Validate the executable offboarding actions only.
@@ -241,12 +256,15 @@ def _validate_execution_plan(
         if action.resource_type != resource.resource_type:
             errors.append(f"Wrong resource type for {action.resource_key}.")
 
-        invalid_evidence = set(action.evidence_ids) - allowed_evidence_ids
+        invalid_evidence = (
+            set(action.evidence_ids) - allowed_evidence_ids - set(allowed_lesson_ids)
+        )
         if invalid_evidence:
             errors.append(
                 f"Action for {action.resource_key} cites unavailable evidence: "
                 f"{sorted(invalid_evidence)}."
             )
+        errors.extend(policy_first_errors(action))
 
         allowed_actions = allowed_offboarding_actions(resource)
 
@@ -364,7 +382,16 @@ def generate_offboarding_plan_via_graph(
     db: Session,
     case: Case,
     resources: list[CompanyResource],
+    *,
+    lessons: list[LessonContext] | None = None,
+    record_attempt: bool = True,
 ) -> tuple[OffboardingPlan, object]:
+    """Plan an offboarding with LangGraph.
+
+    lessons: None retrieves approved lessons from memory; a list (also an
+    empty one) is used as given, which the lesson-reuse evaluation needs to
+    compare a plan with and without a lesson.
+    """
     subject = db.get(Person, case.subject_person_id)
     if subject is None:
         raise OffboardingPlanningError(
@@ -375,6 +402,14 @@ def generate_offboarding_plan_via_graph(
     allowed_evidence_ids = {
         item.evidence_id for item in policy_context.evidence
     }
+    if lessons is None:
+        lessons = retrieve_offboarding_lessons(
+            db,
+            department=subject.department,
+            job_title=subject.job_title,
+            resources=resources,
+        )
+    allowed_lesson_ids = {lesson.evidence_id for lesson in lessons}
 
     def load_case_fn(case_id: str) -> dict:
         if str(case.id) != str(case_id):
@@ -404,6 +439,7 @@ def generate_offboarding_plan_via_graph(
         return {
             "policy_context": policy_context,
             "allowed_evidence_ids": sorted(allowed_evidence_ids),
+            "lesson_ids": sorted(allowed_lesson_ids),
         }
 
     def generate_plan_fn(
@@ -423,11 +459,12 @@ def generate_offboarding_plan_via_graph(
                 subject,
                 resources,
                 policy_context,
+                lessons,
             )
         )
 
         plan = derive_agent_credential_actions(
-            OffboardingPlan.model_validate(result), resources
+            OffboardingPlan.model_validate(result), resources, lessons
         )
 
         # Questions have their own graph node, so ignore any questions the
@@ -455,6 +492,7 @@ def generate_offboarding_plan_via_graph(
             resources,
             allowed_evidence_ids,
             policy_context,
+            allowed_lesson_ids,
         )
 
     def generate_questions_fn(
@@ -471,6 +509,7 @@ def generate_offboarding_plan_via_graph(
                     subject,
                     resources,
                     policy_context,
+                    lessons,
                 ),
                 "offboarding_plan": json.dumps(
                     jsonable_encoder(draft),
@@ -522,6 +561,7 @@ def generate_offboarding_plan_via_graph(
                     subject,
                     resources,
                     policy_context,
+                    lessons,
                 ),
                 "failed_plan": json.dumps(
                     jsonable_encoder(draft),
@@ -535,7 +575,7 @@ def generate_offboarding_plan_via_graph(
         )
 
         repaired = derive_agent_credential_actions(
-            OffboardingPlan.model_validate(result), resources
+            OffboardingPlan.model_validate(result), resources, lessons
         )
         repaired.targeted_questions = []
 
@@ -560,6 +600,7 @@ def generate_offboarding_plan_via_graph(
                     subject,
                     resources,
                     policy_context,
+                    lessons,
                 ),
                 "current_questions": json.dumps(
                     current.get("questions", []),
@@ -614,10 +655,11 @@ def generate_offboarding_plan_via_graph(
             or result.get("validation_errors")
             or []
         )
-        record_plan_generation_attempt(
-            case_id=case.id, case_type="OFFBOARDING",
-            repair_count=repair_count, valid=False, errors=list(errors),
-        )
+        if record_attempt:
+            record_plan_generation_attempt(
+                case_id=case.id, case_type="OFFBOARDING",
+                repair_count=repair_count, valid=False, errors=list(errors),
+            )
         raise OffboardingPlanningError(
             "Offboarding LangGraph could not produce a valid plan "
             f"after one repair attempt. Errors: {'; '.join(errors)}"
@@ -630,9 +672,10 @@ def generate_offboarding_plan_via_graph(
         )
 
     plan = OffboardingPlan.model_validate(final_output)
-    record_plan_generation_attempt(
-        case_id=case.id, case_type="OFFBOARDING", repair_count=repair_count, valid=True,
-    )
+    if record_attempt:
+        record_plan_generation_attempt(
+            case_id=case.id, case_type="OFFBOARDING", repair_count=repair_count, valid=True,
+        )
 
     # Final deterministic safety check using the existing full validator
     # remains in the service after this function returns.

@@ -176,6 +176,12 @@ def execution_outcomes(db: Session) -> dict[str, Any]:
     }
 
 
+def lesson_reuse(db: Session) -> dict[str, Any]:
+    from app.evaluation.lesson_reuse import lesson_reuse as measure
+
+    return measure(db)
+
+
 def run_all(db: Session, *, access_v1: str, access_v2: str, demo_mode: str) -> dict[str, Any]:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -187,4 +193,5 @@ def run_all(db: Session, *, access_v1: str, access_v2: str, demo_mode: str) -> d
         "retrieval": retrieval_recall(db),
         "guardian": guardian_accuracy(access_v1, access_v2),
         "execution": execution_outcomes(db),
+        "lesson_reuse": lesson_reuse(db),
     }

@@ -533,6 +533,11 @@
         ['Guardian impact recall', e.guardian.recall_pct, e.guardian.n_scenarios],
         ['Actions verified', e.execution.verified_completion_pct, e.execution.n],
       ];
+      const lr = e.lesson_reuse;
+      if (lr && lr.n) {
+        rows.push(['Plan matches past correction, no lesson', lr.matches_correction_without_lesson_pct, lr.n]);
+        rows.push(['Plan matches past correction, with lesson', lr.matches_correction_with_lesson_pct, lr.n]);
+      }
       const bar = (v) => (v === null ? '' : `<div class="bar" style="margin-top:6px"><i style="width:${v}%;background:${v >= 90 ? 'var(--ok)' : v >= 70 ? 'var(--warn)' : 'var(--bad)'}"></i></div>`);
       $('eval').innerHTML = `<table class="data"><tbody>${rows.map(([l, v, n]) => `
         <tr><td>${esc(l)}${bar(v)}</td><td style="text-align:right"><b class="num">${v === null ? '—' : v + '%'}</b></td><td class="faint num">n=${n}</td></tr>`).join('')}
